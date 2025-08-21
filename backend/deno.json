@@ -1,14 +1,13 @@
 {
   "tasks": {
-    "dev": "deno run --watch --allow-net --allow-read --allow-write --allow-env --allow-plugin main.ts"
+    "dev": "deno run --watch --allow-net --allow-read --allow-write --allow-env --allow-run main.ts"
   },
   "imports": {
     "oak": "https://deno.land/x/oak@v12.6.1/mod.ts",
     "cors": "https://deno.land/x/cors@v1.2.2/mod.ts",
-    "sqlite": "https://deno.land/x/sqlite@v3.8/mod.ts"
+    "sqlite": "https://deno.land/x/sqlite@v0.8.0/mod.ts"
   },
   "compilerOptions": {
-    "allowJs": true,
     "lib": ["deno.window"],
     "strict": true
   }

@@ -1,47 +1,118 @@
-import { DB } from "https://deno.land/x/sqlite@v3.8/mod.ts";
+// Simple in-memory database for development
+interface ApiKey {
+  id: number;
+  provider: string;
+  key_name: string;
+  key_value: string;
+  created_at: string;
+  updated_at: string;
+}
 
-// Initialize the database
-const db = new DB("llm_speed_test.db");
+interface TestResult {
+  id: number;
+  prompt: string;
+  provider: string;
+  model: string;
+  response_time: number;
+  response_text?: string;
+  status: string;
+  created_at: string;
+}
 
-// Create tables if they don't exist
-db.execute(`
-  CREATE TABLE IF NOT EXISTS api_keys (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    provider TEXT NOT NULL,
-    key_name TEXT NOT NULL,
-    key_value TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+interface Provider {
+  id: number;
+  name: string;
+  base_url: string;
+  is_active: boolean;
+  created_at: string;
+}
 
-db.execute(`
-  CREATE TABLE IF NOT EXISTS test_results (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    prompt TEXT NOT NULL,
-    provider TEXT NOT NULL,
-    model TEXT NOT NULL,
-    response_time INTEGER NOT NULL,
-    response_text TEXT,
-    status TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+// In-memory storage
+let apiKeys: ApiKey[] = [];
+let testResults: TestResult[] = [];
+let providers: Provider[] = [
+  {
+    id: 1,
+    name: 'OpenRouter',
+    base_url: 'https://openrouter.ai/api/v1',
+    is_active: true,
+    created_at: new Date().toISOString()
+  }
+];
 
-db.execute(`
-  CREATE TABLE IF NOT EXISTS providers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    base_url TEXT NOT NULL,
-    is_active BOOLEAN DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+let nextId = 1;
 
-// Insert default providers if they don't exist
-db.execute(`
-  INSERT OR IGNORE INTO providers (name, base_url) 
-  VALUES ('OpenRouter', 'https://openrouter.ai/api/v1')
-`);
+// Database interface
+class InMemoryDB {
+  private query<T>(sql: string, params: any[] = []): T[] {
+    // This is a very simple query implementation
+    // In a real implementation, you would parse the SQL and execute it properly
+    if (sql.includes('INSERT INTO api_keys')) {
+      const newApiKey: ApiKey = {
+        id: nextId++,
+        provider: params[0],
+        key_name: params[1],
+        key_value: params[2],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      apiKeys.push(newApiKey);
+      return [newApiKey] as T[];
+    }
+    
+    if (sql.includes('SELECT * FROM api_keys')) {
+      if (params.length > 0) {
+        // Filter by provider and key_name
+        return apiKeys.filter(key =>
+          key.provider === params[1] && key.key_name === params[0]
+        ) as T[];
+      }
+      return apiKeys as T[];
+    }
+    
+    if (sql.includes('INSERT INTO test_results')) {
+      const newTestResult: TestResult = {
+        id: nextId++,
+        prompt: params[0],
+        provider: params[1],
+        model: params[2],
+        response_time: params[3],
+        response_text: params[4],
+        status: params[5],
+        created_at: new Date().toISOString()
+      };
+      testResults.push(newTestResult);
+      return [newTestResult] as T[];
+    }
+    
+    if (sql.includes('SELECT * FROM test_results')) {
+      return testResults.slice(0, params[0] || 50) as T[];
+    }
+    
+    if (sql.includes('SELECT * FROM providers')) {
+      return providers as T[];
+    }
+    
+    return [];
+  }
+  
+  private execute(sql: string, params: any[] = []): any {
+    if (sql.includes('CREATE TABLE')) {
+      // Tables are already created in memory
+      return { lastInsertRowId: 0 };
+    }
+    
+    if (sql.includes('INSERT OR IGNORE INTO providers')) {
+      // Provider already exists
+      return { lastInsertRowId: 0 };
+    }
+    
+    return this.query(sql, params);
+  }
+  
+  query = this.query;
+  execute = this.execute;
+}
 
+const db = new InMemoryDB();
 export default db;

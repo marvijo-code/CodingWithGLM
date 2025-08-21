@@ -15,22 +15,32 @@ function Cleanup {
 }
 
 # Set up signal handlers
+[Console]::TreatControlCAsInput = $false
 $ctrlC = {
     Cleanup
 }
-[Console]::TreatControlCAsInput = $false
-[Console]::CancelKeyPress.Add_Handler($ctrlC)
+try {
+    $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action $ctrlC
+    $null = [Console]::CancelKeyPress.Register({
+        param($sender, $e)
+        Cleanup
+        $e.Cancel = $true
+    })
+} catch {
+    # Fallback if event registration fails
+    Write-Host "Warning: Could not register event handlers. Ctrl+C may not work properly." -ForegroundColor Yellow
+}
 
 # Start backend
 Write-Host "Starting backend..." -ForegroundColor Cyan
-$backendProcess = Start-Process -FilePath "deno" -ArgumentList "task", "dev" -WorkingDirectory "./backend" -PassThru -NoNewWindow
+$backendProcess = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "deno", "task", "dev" -WorkingDirectory "./backend" -PassThru -NoNewWindow
 
 # Wait a moment for backend to start
 Start-Sleep -Seconds 2
 
 # Start frontend
 Write-Host "Starting frontend..." -ForegroundColor Cyan
-$frontendProcess = Start-Process -FilePath "npm" -ArgumentList "run", "dev" -WorkingDirectory "./frontend" -PassThru -NoNewWindow
+$frontendProcess = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm", "run", "dev" -WorkingDirectory "./frontend" -PassThru -NoNewWindow
 
 Write-Host ""
 Write-Host "================================================" -ForegroundColor Green

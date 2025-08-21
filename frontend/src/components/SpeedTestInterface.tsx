@@ -4,17 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { apiService, SpeedTestResult, SpeedTestComparison } from '@/services/api';
+import { apiService } from '@/services/api';
+import type { SpeedTestComparison } from '@/services/api';
 
-interface ModelOption {
-  id: string;
-  name: string;
+interface ApiKeyStatusResponse {
+  hasApiKey: boolean;
 }
 
 export function SpeedTestInterface() {
   const [prompt, setPrompt] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [availableModels, setAvailableModels] = useState<ModelOption[]>([]);
   const [popularModels, setPopularModels] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<SpeedTestComparison | null>(null);
@@ -28,8 +27,9 @@ export function SpeedTestInterface() {
       try {
         const response = await apiService.getApiKeyStatus();
         if (response.success && response.data) {
-          setApiKeyStatus(response.data.hasApiKey);
-          setShowApiKeyInput(!response.data.hasApiKey);
+          const data = response.data as ApiKeyStatusResponse;
+          setApiKeyStatus(data.hasApiKey);
+          setShowApiKeyInput(!data.hasApiKey);
         }
       } catch (error) {
         console.error('Error checking API key status:', error);
@@ -42,8 +42,9 @@ export function SpeedTestInterface() {
       try {
         const response = await apiService.getPopularModels();
         if (response.success && response.data) {
-          setPopularModels(response.data);
-          setSelectedModels(response.data.slice(0, 3)); // Select first 3 by default
+          const models = response.data as string[];
+          setPopularModels(models);
+          setSelectedModels(models.slice(0, 3)); // Select first 3 by default
         }
       } catch (error) {
         console.error('Error loading popular models:', error);

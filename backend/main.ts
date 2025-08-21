@@ -48,21 +48,23 @@ app.use("/api/speed-test", speedTestRoutes.routes());
 app.use("/api/speed-test", speedTestRoutes.allowedMethods());
 
 // Test results route
-app.get("/api/test-results", (ctx) => {
-  try {
-    const limit = parseInt(ctx.request.url.searchParams.get("limit") || "50");
-    const results = DbService.getTestResults(limit);
-    ctx.response.body = {
-      success: true,
-      data: results,
-    };
-  } catch (error) {
-    console.error("Error fetching test results:", error);
-    ctx.response.status = 500;
-    ctx.response.body = {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
+app.use("/api/test-results", (ctx) => {
+  if (ctx.request.method === "GET") {
+    try {
+      const limit = parseInt(ctx.request.url.searchParams.get("limit") || "50");
+      const results = DbService.getTestResults(limit);
+      ctx.response.body = {
+        success: true,
+        data: results,
+      };
+    } catch (error) {
+      console.error("Error fetching test results:", error);
+      ctx.response.status = 500;
+      ctx.response.body = {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
   }
 });
 
