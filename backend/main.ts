@@ -3,6 +3,7 @@ import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 import openRouterRoutes from "./routes/openRouter.ts";
 import speedTestRoutes from "./routes/speedTest.ts";
 import { saveRunHistory, getRunHistory, getRunStats } from "./routes/runHistory.ts";
+import { LLMManagementHandler } from "./routes/llmManagement.ts";
 import { DbService } from "./services/dbService.ts";
 
 const app = new Application();
@@ -93,6 +94,132 @@ app.use(async (ctx, next) => {
     ctx.response.body = await response.json();
     return;
   }
+  return next();
+});
+
+// LLM Management routes
+app.use(async (ctx, next) => {
+  const path = ctx.request.url.pathname;
+  const method = ctx.request.method;
+
+  // LLM Providers
+  if (path === "/api/llm/providers" && method === "GET") {
+    try {
+      const result = await LLMManagementHandler.getProviders();
+      ctx.response.body = result;
+      return;
+    } catch (error) {
+      ctx.response.status = 500;
+      ctx.response.body = { error: error instanceof Error ? error.message : "Unknown error" };
+      return;
+    }
+  }
+
+  // LLM Provider by name
+  if (path.startsWith("/api/llm/providers/") && !path.includes("/models") && method === "GET") {
+    try {
+      const name = path.split("/")[4];
+      const result = await LLMManagementHandler.getProvider(name);
+      ctx.response.body = result;
+      return;
+    } catch (error) {
+      ctx.response.status = 500;
+      ctx.response.body = { error: error instanceof Error ? error.message : "Unknown error" };
+      return;
+    }
+  }
+
+  // Provider models
+  if (path.match(/^\/api\/llm\/providers\/[^\/]+\/models$/) && (method === "GET" || method === "POST")) {
+    try {
+      const name = path.split("/")[4];
+      let apiKey: string | undefined;
+      
+      if (method === "GET") {
+        apiKey = ctx.request.url.searchParams.get("apiKey") || undefined;
+      } else {
+        const body = await ctx.request.body({ type: "json" }).value;
+        apiKey = body.apiKey;
+      }
+      
+      const result = await LLMManagementHandler.fetchProviderModels(name, apiKey);
+      ctx.response.body = result;
+      return;
+    } catch (error) {
+      ctx.response.status = 500;
+      ctx.response.body = { error: error instanceof Error ? error.message : "Unknown error" };
+      return;
+    }
+  }
+
+  // LLM Models
+  if (path === "/api/llm/models" && method === "GET") {
+    try {
+      const providerId = ctx.request.url.searchParams.get("providerId");
+      const result = await LLMManagementHandler.getModels(providerId ? parseInt(providerId) : undefined);
+      ctx.response.body = result;
+      return;
+    } catch (error) {
+      ctx.response.status = 500;
+      ctx.response.body = { error: error instanceof Error ? error.message : "Unknown error" };
+      return;
+    }
+  }
+
+  if (path === "/api/llm/models" && method === "POST") {
+    try {
+      const body = await ctx.request.body({ type: "json" }).value;
+      const result = await LLMManagementHandler.createModel(body);
+      ctx.response.body = result;
+      return;
+    } catch (error) {
+      ctx.response.status = 500;
+      ctx.response.body = { error: error instanceof Error ? error.message : "Unknown error" };
+      return;
+    }
+  }
+
+  // LLM Model by ID
+  if (path.match(/^\/api\/llm\/models\/\d+$/) && method === "GET") {
+    try {
+      const id = parseInt(path.split("/")[4]);
+      const result = await LLMManagementHandler.getModel(id);
+      ctx.response.body = result;
+      return;
+    } catch (error) {
+      ctx.response.status = 500;
+      ctx.response.body = { error: error instanceof Error ? error.message : "Unknown error" };
+      return;
+    }
+  }
+
+  if (path.match(/^\/api\/llm\/models\/\d+$/) && method === "PUT") {
+    try {
+      const id = parseInt(path.split("/")[4]);
+      const body = await ctx.request.body({ type: "json" }).value;
+      const result = await LLMManagementHandler.updateModel(id, body);
+      ctx.response.body = result;
+      return;
+    } catch (error) {
+      ctx.response.status = 500;
+      ctx.response.body = { error: error instanceof Error ? error.message : "Unknown error" };
+      return;
+    }
+  }
+
+  if (path.match(/^\/api\/llm\/models\/\d+$/) && method === "DELETE") {
+    try {
+      const id = parseInt(path.split("/")[4]);
+      const result = await LLMManagementHandler.deleteModel(id);
+      ctx.response.body = result;
+      return;
+    } catch (error) {
+      ctx.response.status = 500;
+      ctx.response.body = { error: error instanceof Error ? error.message : "Unknown error" };
+      return;
+    }
+  }
+
   return next();
 });
 

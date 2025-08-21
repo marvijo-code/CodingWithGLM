@@ -33,6 +33,32 @@ interface RunStats {
   avgReasoningTokens: number;
 }
 
+interface LLMProvider {
+  id: number;
+  name: string;
+  display_name: string;
+  base_url: string;
+  api_key_required: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface LLMModel {
+  id: number;
+  provider_id: number;
+  model_id: string;
+  display_name: string;
+  description?: string;
+  context_length?: number;
+  max_output_tokens?: number;
+  input_cost_per_token?: number;
+  output_cost_per_token?: number;
+  supports_streaming: boolean;
+  supports_reasoning: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
 class InMemoryDB {
   private apiKeys: any[] = [];
   private testResults: any[] = [];
@@ -46,11 +72,70 @@ class InMemoryDB {
       created_at: new Date().toISOString()
     }
   ];
+  private llmProviders: LLMProvider[] = [
+    {
+      id: 1,
+      name: "openrouter",
+      display_name: "OpenRouter",
+      base_url: "https://openrouter.ai/api/v1",
+      api_key_required: true,
+      is_active: true,
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 2,
+      name: "openai",
+      display_name: "OpenAI",
+      base_url: "https://api.openai.com/v1",
+      api_key_required: true,
+      is_active: true,
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 3,
+      name: "anthropic",
+      display_name: "Anthropic",
+      base_url: "https://api.anthropic.com/v1",
+      api_key_required: true,
+      is_active: true,
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 4,
+      name: "google",
+      display_name: "Google",
+      base_url: "https://generativelanguage.googleapis.com/v1",
+      api_key_required: true,
+      is_active: true,
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 5,
+      name: "deepseek",
+      display_name: "DeepSeek",
+      base_url: "https://api.deepseek.com/v1",
+      api_key_required: true,
+      is_active: true,
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 6,
+      name: "xai",
+      display_name: "xAI",
+      base_url: "https://api.x.ai/v1",
+      api_key_required: true,
+      is_active: true,
+      created_at: new Date().toISOString()
+    }
+  ];
+  private llmModels: LLMModel[] = [];
   private nextId = {
     apiKeys: 1,
     testResults: 1,
     providers: 2,
-    runHistory: 1
+    runHistory: 1,
+    llmProviders: 7,
+    llmModels: 1
   };
 
   constructor() {
@@ -180,6 +265,22 @@ class InMemoryDB {
         .reverse()
         .slice(0, limit || 50) as T[];
     }
+
+    if (sql.includes("SELECT * FROM llm_providers")) {
+      if (params.length > 0) {
+        const [name] = params;
+        return this.llmProviders.filter(p => p.name === name) as T[];
+      }
+      return [...this.llmProviders] as T[];
+    }
+
+    if (sql.includes("SELECT * FROM llm_models")) {
+      if (params.length > 0) {
+        const [providerId] = params;
+        return this.llmModels.filter(m => m.provider_id === providerId) as T[];
+      }
+      return [...this.llmModels] as T[];
+    }
     
     return [];
   }
@@ -247,6 +348,58 @@ class InMemoryDB {
       };
       this.runHistory.push(newRun);
       return { lastInsertRowId: newRun.id, changes: 1 };
+    }
+
+    if (sql.includes("INSERT INTO llm_providers")) {
+      const [name, displayName, baseUrl, apiKeyRequired, isActive] = params;
+      const newProvider: LLMProvider = {
+        id: this.nextId.llmProviders++,
+        name,
+        display_name: displayName,
+        base_url: baseUrl,
+        api_key_required: Boolean(apiKeyRequired),
+        is_active: Boolean(isActive),
+        created_at: new Date().toISOString()
+      };
+      this.llmProviders.push(newProvider);
+      return { lastInsertRowId: newProvider.id, changes: 1 };
+    }
+
+    if (sql.includes("INSERT INTO llm_models")) {
+      const [providerId, modelId, displayName, description, contextLength, maxOutputTokens, inputCost, outputCost, supportsStreaming, supportsReasoning, isActive] = params;
+      const newModel: LLMModel = {
+        id: this.nextId.llmModels++,
+        provider_id: providerId,
+        model_id: modelId,
+        display_name: displayName,
+        description: description || undefined,
+        context_length: contextLength || undefined,
+        max_output_tokens: maxOutputTokens || undefined,
+        input_cost_per_token: inputCost || undefined,
+        output_cost_per_token: outputCost || undefined,
+        supports_streaming: Boolean(supportsStreaming),
+        supports_reasoning: Boolean(supportsReasoning),
+        is_active: Boolean(isActive),
+        created_at: new Date().toISOString()
+      };
+      this.llmModels.push(newModel);
+      return { lastInsertRowId: newModel.id, changes: 1 };
+    }
+
+    if (sql.includes("UPDATE llm_models SET is_active")) {
+      const [isActive, id] = params;
+      const modelIndex = this.llmModels.findIndex(m => m.id === id);
+      if (modelIndex !== -1) {
+        this.llmModels[modelIndex].is_active = Boolean(isActive);
+        return { lastInsertRowId: id, changes: 1 };
+      }
+    }
+
+    if (sql.includes("DELETE FROM llm_models")) {
+      const [id] = params;
+      const originalLength = this.llmModels.length;
+      this.llmModels = this.llmModels.filter(m => m.id !== id);
+      return { lastInsertRowId: 0, changes: originalLength - this.llmModels.length };
     }
 
     return { lastInsertRowId: 0, changes: 0 };
@@ -371,9 +524,65 @@ class InMemoryDB {
       successRate: stats.totalRuns > 0 ? (stats.successfulRuns / stats.totalRuns) * 100 : 0
     }));
   }
+
+  // LLM Provider methods
+  getLLMProviders(): LLMProvider[] {
+    return [...this.llmProviders];
+  }
+
+  getLLMProvider(name: string): LLMProvider | undefined {
+    return this.llmProviders.find(p => p.name === name);
+  }
+
+  createLLMProvider(provider: Omit<LLMProvider, "id" | "created_at">): number {
+    const newProvider: LLMProvider = {
+      id: this.nextId.llmProviders++,
+      ...provider,
+      created_at: new Date().toISOString()
+    };
+    this.llmProviders.push(newProvider);
+    return newProvider.id;
+  }
+
+  // LLM Model methods
+  getLLMModels(providerId?: number): LLMModel[] {
+    if (providerId) {
+      return this.llmModels.filter(m => m.provider_id === providerId);
+    }
+    return [...this.llmModels];
+  }
+
+  getLLMModel(id: number): LLMModel | undefined {
+    return this.llmModels.find(m => m.id === id);
+  }
+
+  createLLMModel(model: Omit<LLMModel, "id" | "created_at">): number {
+    const newModel: LLMModel = {
+      id: this.nextId.llmModels++,
+      ...model,
+      created_at: new Date().toISOString()
+    };
+    this.llmModels.push(newModel);
+    return newModel.id;
+  }
+
+  updateLLMModel(id: number, updates: Partial<LLMModel>): boolean {
+    const modelIndex = this.llmModels.findIndex(m => m.id === id);
+    if (modelIndex !== -1) {
+      this.llmModels[modelIndex] = { ...this.llmModels[modelIndex], ...updates };
+      return true;
+    }
+    return false;
+  }
+
+  deleteLLMModel(id: number): boolean {
+    const originalLength = this.llmModels.length;
+    this.llmModels = this.llmModels.filter(m => m.id !== id);
+    return this.llmModels.length < originalLength;
+  }
 }
 
 const db = new InMemoryDB();
 
 export default db;
-export type { RunHistory, RunStats };
+export type { RunHistory, RunStats, LLMProvider, LLMModel };

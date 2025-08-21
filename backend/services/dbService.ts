@@ -1,4 +1,5 @@
 import db from "../db.ts";
+import type { LLMProvider, LLMModel } from "../db.ts";
 
 export interface ApiKey {
   id?: number;
@@ -54,7 +55,7 @@ export class DbService {
     const result = db.query("SELECT * FROM api_keys WHERE key_name = ? AND provider = ?", [keyName, provider]);
     if (result.length === 0) return undefined;
     
-    const row = result[0];
+    const row = result[0] as any;
     return {
       id: row.id,
       provider: row.provider,
@@ -132,7 +133,7 @@ export class DbService {
     const result = db.query("SELECT * FROM providers WHERE name = ?", [name]);
     if (result.length === 0) return undefined;
     
-    const row = result[0];
+    const row = result[0] as any;
     return {
       id: row.id,
       name: row.name,
@@ -148,5 +149,39 @@ export class DbService {
       [provider.name, provider.base_url, provider.is_active ? 1 : 0]
     );
     return result.lastInsertRowId;
+  }
+
+  // LLM Provider operations
+  static getLLMProviders(): LLMProvider[] {
+    return db.getLLMProviders();
+  }
+
+  static getLLMProvider(name: string): LLMProvider | undefined {
+    return db.getLLMProvider(name);
+  }
+
+  static createLLMProvider(provider: Omit<LLMProvider, "id" | "created_at">): number {
+    return db.createLLMProvider(provider);
+  }
+
+  // LLM Model operations
+  static getLLMModels(providerId?: number): LLMModel[] {
+    return db.getLLMModels(providerId);
+  }
+
+  static getLLMModel(id: number): LLMModel | undefined {
+    return db.getLLMModel(id);
+  }
+
+  static createLLMModel(model: Omit<LLMModel, "id" | "created_at">): number {
+    return db.createLLMModel(model);
+  }
+
+  static updateLLMModel(id: number, updates: Partial<LLMModel>): boolean {
+    return db.updateLLMModel(id, updates);
+  }
+
+  static deleteLLMModel(id: number): boolean {
+    return db.deleteLLMModel(id);
   }
 }
