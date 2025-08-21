@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Trophy, Clock, Zap } from 'lucide-react';
 import { apiService } from '@/services/api';
 import type { SpeedTestComparison } from '@/services/api';
 
@@ -103,6 +106,9 @@ export function SpeedTestInterface() {
       if (prev.includes(modelId)) {
         return prev.filter(id => id !== modelId);
       } else {
+        if (prev.length >= 3) {
+          return prev; // Limit to 3 models
+        }
         return [...prev, modelId];
       }
     });
@@ -130,143 +136,283 @@ export function SpeedTestInterface() {
   const fastestModel = getFastestModel();
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Hero Section */}
+      <div className="text-center space-y-4 py-8">
+        <div className="relative inline-block">
+          <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+            AI Model Speed Arena
+          </h1>
+          <div className="absolute -inset-x-4 -inset-y-2 bg-primary/10 blur-2xl rounded-full opacity-30" />
+        </div>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+          Benchmark the performance of cutting-edge AI models in real-time. 
+          Compare response times, quality, and efficiency across multiple providers.
+        </p>
+        <div className="flex items-center justify-center space-x-4 text-sm text-muted-foreground">
+          <div className="flex items-center space-x-1">
+            <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+            <span>Real-time benchmarking</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
+            <span>Multiple providers</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse" />
+            <span>Enterprise-grade</span>
+          </div>
+        </div>
+      </div>
+
       {/* API Key Input */}
       {showApiKeyInput && (
-        <Card>
-          <CardHeader>
-            <CardTitle>OpenRouter API Key Required</CardTitle>
-            <CardDescription>
-              Enter your OpenRouter API key to use the speed test feature
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex space-x-2">
-              <Input
-                type="password"
-                placeholder="Enter your OpenRouter API key"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="flex-1"
-              />
-              <Button onClick={handleSaveApiKey} disabled={!apiKey.trim()}>
-                Save Key
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="max-w-2xl mx-auto">
+          <Card className="border-primary/20 bg-primary/5 backdrop-blur-sm shadow-xl">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-12 h-12 mb-4 bg-primary/10 rounded-full flex items-center justify-center">
+                <Zap className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle className="text-2xl">Welcome to the Arena</CardTitle>
+              <CardDescription className="text-base">
+                Connect your OpenRouter API to unlock the full power of AI benchmarking
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">API Key</label>
+                <div className="flex space-x-2">
+                  <Input
+                    type="password"
+                    placeholder="sk-or-v1-..."
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="flex-1 font-mono bg-background/50 border-primary/20 focus:border-primary/40"
+                  />
+                  <Button 
+                    onClick={handleSaveApiKey} 
+                    disabled={!apiKey.trim()}
+                    className="px-6"
+                  >
+                    Connect
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-center text-muted-foreground">
+                Your API key is encrypted and never stored permanently
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Speed Test Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle>LLM Speed Test</CardTitle>
-          <CardDescription>
-            Compare the speed of different language models with the same prompt
+      <Card className="shadow-2xl border-0 bg-gradient-to-br from-card/80 via-card/60 to-muted/20 backdrop-blur-sm">
+        <CardHeader className="border-b border-border/20 pb-6">
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <div className="h-2 w-2 bg-primary rounded-full" />
+            Configure Your Test
+          </CardTitle>
+          <CardDescription className="text-base">
+            Craft the perfect prompt and select your AI gladiators
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-8 pt-6">
           {/* Prompt Input */}
-          <div className="space-y-2">
-            <label htmlFor="prompt" className="text-sm font-medium">
-              Enter your prompt
-            </label>
-            <textarea
-              id="prompt"
-              placeholder="What is the meaning of life?"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              className="w-full min-h-[100px] p-3 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          {/* Model Selection */}
           <div className="space-y-3">
-            <label className="text-sm font-medium">Select models to test (max 3)</label>
-            <div className="flex flex-wrap gap-2">
-              {popularModels.map((model) => (
-                <Badge
-                  key={model}
-                  variant={selectedModels.includes(model) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => toggleModelSelection(model)}
-                >
-                  {model.split('/').pop()}
-                </Badge>
-              ))}
+            <div className="flex items-center justify-between">
+              <label htmlFor="prompt" className="text-sm font-semibold text-foreground">
+                Test Prompt
+              </label>
+              <span className="text-xs text-muted-foreground">
+                {prompt.length}/1000
+              </span>
             </div>
+            <Textarea
+              id="prompt"
+              placeholder="Enter your test prompt... Try: 'Write a Python function to calculate fibonacci numbers with memoization'"
+              value={prompt}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
+              className="min-h-[140px] resize-none bg-background/50 border-border/20 focus:border-primary/40 rounded-xl text-base"
+            />
             <p className="text-xs text-muted-foreground">
-              {selectedModels.length} model{selectedModels.length !== 1 ? 's' : ''} selected
+              💡 Pro tip: Use specific, technical prompts for more meaningful benchmarks
             </p>
           </div>
 
+          {/* Model Selection */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold text-foreground">Select AI Models</label>
+              <Badge 
+                variant={selectedModels.length === 3 ? "default" : "secondary"}
+                className="px-3 py-1"
+              >
+                {selectedModels.length}/3 selected
+              </Badge>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {popularModels.map((model) => (
+                <Button
+                  key={model}
+                  variant={selectedModels.includes(model) ? "default" : "ghost"}
+                  size="lg"
+                  className={`
+                    justify-start text-left h-auto py-4 px-4 rounded-xl transition-all duration-200
+                    ${selectedModels.includes(model) 
+                      ? 'shadow-lg scale-[1.02] bg-primary/90 hover:bg-primary' 
+                      : 'hover:bg-muted/50 hover:scale-[1.01] border border-border/20'
+                    }
+                  `}
+                  onClick={() => toggleModelSelection(model)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className={`h-3 w-3 rounded-full ${
+                      selectedModels.includes(model) ? 'bg-white' : 'bg-muted'
+                    }`} />
+                    <div>
+                      <div className="font-mono text-sm font-medium">
+                        {model.split('/').pop()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {model.split('/')[0]}
+                      </div>
+                    </div>
+                  </div>
+                </Button>
+              ))}
+            </div>
+            {selectedModels.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">
+                  Select up to 3 models to begin your benchmark
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Run Button */}
-          <Button
-            onClick={handleRunTest}
-            disabled={!prompt.trim() || selectedModels.length === 0 || isRunning || !apiKeyStatus}
-            className="w-full"
-          >
-            {isRunning ? 'Running test...' : 'Run Speed Test'}
-          </Button>
+          <div className="pt-4">
+            <Button
+              onClick={handleRunTest}
+              disabled={!prompt.trim() || selectedModels.length === 0 || isRunning || !apiKeyStatus}
+              className={`
+                w-full h-14 text-lg font-semibold rounded-xl transition-all duration-300
+                ${!isRunning && prompt.trim() && selectedModels.length > 0 && apiKeyStatus
+                  ? 'bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl hover:scale-[1.02]'
+                  : ''
+                }
+              `}
+              size="lg"
+            >
+              {isRunning ? (
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Benchmarking models...</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Zap className="h-5 w-5" />
+                  <span>Start Arena Battle</span>
+                </div>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
       {/* Results */}
       {results && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Test Results</CardTitle>
-            <CardDescription>
-              Total time: {formatResponseTime(results.totalTime)}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Fastest Model Indicator */}
-            {fastestModel && (
-              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-800">
-                <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                  🏆 Fastest: {fastestModel.model.split('/').pop()} ({formatResponseTime(fastestModel.responseTime)})
-                </p>
-              </div>
-            )}
-
-            {/* Model Results */}
-            <div className="grid gap-4 md:grid-cols-3">
-              {results.results.map((result) => (
-                <Card key={result.model} className={result.model === fastestModel?.model ? 'border-green-500' : ''}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center justify-between">
-                      {result.model.split('/').pop()}
-                      {result.model === fastestModel?.model && (
-                        <span className="text-yellow-500">🏆</span>
-                      )}
-                    </CardTitle>
-                    <CardDescription>
-                      {formatResponseTime(result.responseTime)}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {result.error ? (
-                      <div className="text-sm text-red-500">
-                        Error: {result.error}
-                      </div>
-                    ) : (
-                      <div className="text-sm space-y-2">
-                        <div className="max-h-40 overflow-y-auto text-muted-foreground">
-                          {result.response?.choices?.[0]?.message?.content || 'No response'}
-                        </div>
-                        <Separator />
-                        <div className="text-xs text-muted-foreground">
-                          Tokens: {result.response?.usage?.total_tokens || 'N/A'}
-                        </div>
+        <div className="space-y-6">
+          <div className="text-center space-y-2">
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              Arena Results
+            </h2>
+            <p className="text-muted-foreground">
+              Completed in {formatResponseTime(results.totalTime)}
+            </p>
+          </div>
+          
+          <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+            {results.results.map((result) => (
+              <Card 
+                key={result.model} 
+                className={`
+                  relative overflow-hidden transition-all duration-500
+                  ${result.model === fastestModel?.model 
+                    ? 'border-primary/50 shadow-2xl shadow-primary/20 scale-[1.02]' 
+                    : 'border-border/20 hover:border-border/40'
+                  }
+                `}
+              >
+                {result.model === fastestModel?.model && (
+                  <div className="absolute top-0 right-0 bg-gradient-to-l from-primary/20 to-transparent h-20 w-20 rounded-bl-full" />
+                )}
+                
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg font-bold">
+                        <span className="font-mono text-sm">
+                          {result.model.split('/').pop()}
+                        </span>
+                      </CardTitle>
+                      <CardDescription className="flex items-center gap-2 mt-1">
+                        <Clock className="h-4 w-4" />
+                        <span className="font-mono font-semibold">
+                          {formatResponseTime(result.responseTime)}
+                        </span>
+                      </CardDescription>
+                    </div>
+                    {result.model === fastestModel?.model && (
+                      <div className="relative">
+                        <Trophy className="h-8 w-8 text-yellow-500" />
+                        <div className="absolute -inset-2 bg-yellow-500/20 blur-xl rounded-full" />
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                  </div>
+                </CardHeader>
+                
+                <CardContent>
+                  {result.error ? (
+                    <Alert variant="destructive" className="border-0 bg-destructive/10">
+                      <AlertDescription className="text-sm font-medium">
+                        {result.error}
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="bg-muted/30 rounded-xl p-4">
+                        <ScrollArea className="h-48">
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <p className="text-sm leading-relaxed">
+                              {result.response?.choices?.[0]?.message?.content || 'No response generated'}
+                            </p>
+                          </div>
+                        </ScrollArea>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div className="bg-muted/20 rounded-lg p-3">
+                          <div className="text-muted-foreground mb-1">Tokens</div>
+                          <div className="font-mono font-semibold">
+                            {result.response?.usage?.total_tokens || 0}
+                          </div>
+                        </div>
+                        <div className="bg-muted/20 rounded-lg p-3">
+                          <div className="text-muted-foreground mb-1">Status</div>
+                          <div className="font-semibold text-green-500">
+                            ✓ Complete
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

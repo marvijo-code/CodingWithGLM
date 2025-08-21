@@ -1,118 +1,214 @@
-// Simple in-memory database for development
-interface ApiKey {
-  id: number;
-  provider: string;
-  key_name: string;
-  key_value: string;
-  created_at: string;
-  updated_at: string;
+// Simple in-memory database with basic persistence
+interface DatabaseRow {
+  [key: string]: any;
 }
 
-interface TestResult {
-  id: number;
-  prompt: string;
-  provider: string;
-  model: string;
-  response_time: number;
-  response_text?: string;
-  status: string;
-  created_at: string;
-}
-
-interface Provider {
-  id: number;
-  name: string;
-  base_url: string;
-  is_active: boolean;
-  created_at: string;
-}
-
-// In-memory storage
-let apiKeys: ApiKey[] = [];
-let testResults: TestResult[] = [];
-let providers: Provider[] = [
-  {
-    id: 1,
-    name: 'OpenRouter',
-    base_url: 'https://openrouter.ai/api/v1',
-    is_active: true,
-    created_at: new Date().toISOString()
-  }
-];
-
-let nextId = 1;
-
-// Database interface
 class InMemoryDB {
-  private query<T>(sql: string, params: any[] = []): T[] {
-    // This is a very simple query implementation
-    // In a real implementation, you would parse the SQL and execute it properly
-    if (sql.includes('INSERT INTO api_keys')) {
-      const newApiKey: ApiKey = {
-        id: nextId++,
-        provider: params[0],
-        key_name: params[1],
-        key_value: params[2],
+  private apiKeys: any[] = [];
+  private testResults: any[] = [];
+  private providers: any[] = [
+    {
+      id: 1,
+      name: "OpenRouter",
+      base_url: "https://openrouter.ai/api/v1",
+      is_active: true,
+      created_at: new Date().toISOString()
+    }
+  ];
+  private nextId = {
+    apiKeys: 1,
+    testResults: 1,
+    providers: 2
+  };
+
+  constructor() {
+    this.init();
+  }
+
+  private init() {
+    // Initialize with API key from environment or .env file
+    if (this.apiKeys.length === 0) {
+      let apiKey = this.loadApiKeyFromEnv();
+      
+      this.apiKeys.push({
+        id: this.nextId.apiKeys++,
+        provider: "OpenRouter",
+        key_name: "OPENROUTER_API_KEY",
+        key_value: apiKey,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      };
-      apiKeys.push(newApiKey);
-      return [newApiKey] as T[];
+      });
     }
+  }
+
+  private loadApiKeyFromEnv(): string {
+    let apiKey = "";
     
-    if (sql.includes('SELECT * FROM api_keys')) {
-      if (params.length > 0) {
-        // Filter by provider and key_name
-        return apiKeys.filter(key =>
-          key.provider === params[1] && key.key_name === params[0]
-        ) as T[];
+    try {
+      // Try to load from .env file first
+      const envPaths = ['.env.local', '.env'];
+      
+      for (const envPath of envPaths) {
+        try {
+          let envContent: string | null = null;
+          
+          // Deno environment
+          if (typeof (globalThis as any).Deno !== 'undefined') {
+            try {
+              // @ts-ignore
+              envContent = (globalThis as any).Deno.readTextFileSync(envPath) as string;
+            } catch {
+              continue; // File doesn't exist
+            }
+          } else {
+            // Node.js environment
+            try {
+              const fs = (globalThis as any).require?.('fs');
+              if (fs && fs.existsSync && fs.readFileSync) {
+                if (fs.existsSync(envPath)) {
+                  envContent = fs.readFileSync(envPath, 'utf8') as string;
+                }
+              }
+            } catch {
+              continue; // File doesn't exist or fs not available
+            }
+          }
+          
+          if (envContent) {
+            const lines = envContent.split('\n');
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('OPENROUTER_API_KEY=')) {
+                const value = trimmed.substring('OPENROUTER_API_KEY='.length);
+                return value.trim().replace(/^["']|["']$/g, '');
+              }
+            }
+          }
+        } catch {
+          // Continue to next file
+        }
       }
-      return apiKeys as T[];
+      
+      // Fallback to environment variables
+      if (typeof (globalThis as any).Deno !== 'undefined') {
+        apiKey = (globalThis as any).Deno.env.get("OPENROUTER_API_KEY") || "";
+      } else if (typeof globalThis !== 'undefined' && (globalThis as any).process?.env) {
+        apiKey = (globalThis as any).process.env.OPENROUTER_API_KEY || "";
+      }
+    } catch {
+      // Final fallback
+      apiKey = "";
     }
     
-    if (sql.includes('INSERT INTO test_results')) {
-      const newTestResult: TestResult = {
-        id: nextId++,
-        prompt: params[0],
-        provider: params[1],
-        model: params[2],
-        response_time: params[3],
-        response_text: params[4],
-        status: params[5],
-        created_at: new Date().toISOString()
-      };
-      testResults.push(newTestResult);
-      return [newTestResult] as T[];
+    return apiKey;
+  }
+
+  query<T>(sql: string, params: any[] = []): T[] {
+    // Simple query simulation
+    if (sql.includes("SELECT * FROM api_keys")) {
+      if (params.length > 0) {
+        // WHERE clause
+        const [keyName, provider] = params;
+        return this.apiKeys.filter(k => k.key_name === keyName && k.provider === provider) as T[];
+      }
+      return [...this.apiKeys] as T[];
     }
     
-    if (sql.includes('SELECT * FROM test_results')) {
-      return testResults.slice(0, params[0] || 50) as T[];
+    if (sql.includes("SELECT * FROM test_results")) {
+      const limit = params[0] || 50;
+      return [...this.testResults].reverse().slice(0, limit) as T[];
     }
     
-    if (sql.includes('SELECT * FROM providers')) {
-      return providers as T[];
+    if (sql.includes("SELECT * FROM providers")) {
+      return [...this.providers] as T[];
+    }
+
+    if (sql.includes("SELECT * FROM providers WHERE name = ?")) {
+      const name = params[0];
+      return this.providers.filter(p => p.name === name) as T[];
     }
     
     return [];
   }
-  
-  private execute(sql: string, params: any[] = []): any {
-    if (sql.includes('CREATE TABLE')) {
-      // Tables are already created in memory
-      return { lastInsertRowId: 0 };
+
+  execute(sql: string, params: any[] = []): { lastInsertRowId: number; changes: number } {
+    // Simple execute simulation
+    if (sql.includes("INSERT INTO api_keys")) {
+      const [provider, keyName, keyValue] = params;
+      const newKey = {
+        id: this.nextId.apiKeys++,
+        provider,
+        key_name: keyName,
+        key_value: keyValue,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      this.apiKeys.push(newKey);
+      return { lastInsertRowId: newKey.id, changes: 1 };
     }
-    
-    if (sql.includes('INSERT OR IGNORE INTO providers')) {
-      // Provider already exists
-      return { lastInsertRowId: 0 };
+
+    if (sql.includes("INSERT INTO test_results")) {
+      const [prompt, provider, model, responseTime, responseText, status] = params;
+      const newResult = {
+        id: this.nextId.testResults++,
+        prompt,
+        provider,
+        model,
+        response_time: responseTime,
+        response_text: responseText,
+        status,
+        created_at: new Date().toISOString()
+      };
+      this.testResults.push(newResult);
+      return { lastInsertRowId: newResult.id, changes: 1 };
     }
-    
-    return this.query(sql, params);
+
+    if (sql.includes("UPDATE api_keys")) {
+      const id = params[params.length - 1];
+      const keyIndex = this.apiKeys.findIndex(k => k.id === id);
+      
+      if (keyIndex !== -1) {
+        if (params.length > 1) {
+          this.apiKeys[keyIndex].key_value = params[0];
+          this.apiKeys[keyIndex].updated_at = new Date().toISOString();
+        }
+        return { lastInsertRowId: id, changes: 1 };
+      }
+    }
+
+    if (sql.includes("DELETE FROM api_keys")) {
+      const id = params[0];
+      const originalLength = this.apiKeys.length;
+      this.apiKeys = this.apiKeys.filter(k => k.id !== id);
+      return { lastInsertRowId: 0, changes: originalLength - this.apiKeys.length };
+    }
+
+    return { lastInsertRowId: 0, changes: 0 };
   }
-  
-  query = this.query;
-  execute = this.execute;
+
+  deleteApiKey(keyName: string, provider: string): boolean {
+    const initialLength = this.apiKeys.length;
+    this.apiKeys = this.apiKeys.filter(k => !(k.key_name === keyName && k.provider === provider));
+    return this.apiKeys.length < initialLength;
+  }
+
+  // Method to reload API keys from environment
+  reloadApiKeysFromEnv(): void {
+    const newApiKey = this.loadApiKeyFromEnv();
+    if (newApiKey) {
+      this.updateApiKey("OPENROUTER_API_KEY", newApiKey, "OpenRouter");
+    }
+  }
+
+  updateApiKey(keyName: string, keyValue: string, provider: string): void {
+    const keyIndex = this.apiKeys.findIndex(k => k.key_name === keyName && k.provider === provider);
+    if (keyIndex !== -1) {
+      this.apiKeys[keyIndex].key_value = keyValue;
+      this.apiKeys[keyIndex].updated_at = new Date().toISOString();
+    }
+  }
 }
 
 const db = new InMemoryDB();
+
 export default db;

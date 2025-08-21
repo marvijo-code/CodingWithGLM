@@ -1,7 +1,9 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { SpeedTestService } from "../services/speedTestService.ts";
 
-const router = new Router();
+const router = new Router({
+  prefix: "/api/speed-test"
+});
 
 // Run speed test
 router.post("/run", async (ctx) => {

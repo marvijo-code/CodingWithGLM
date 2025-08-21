@@ -39,13 +39,14 @@ export class DbService {
       params.push(provider);
     }
     
-    return db.query(query, [...params]).map((row: any) => ({
-      id: row[0],
-      provider: row[1],
-      key_name: row[2],
-      key_value: row[3],
-      created_at: row[4],
-      updated_at: row[5]
+    const results = db.query(query, params);
+    return results.map((row: any) => ({
+      id: row.id,
+      provider: row.provider,
+      key_name: row.key_name,
+      key_value: row.key_value,
+      created_at: row.created_at,
+      updated_at: row.updated_at
     }));
   }
 
@@ -55,26 +56,26 @@ export class DbService {
     
     const row = result[0];
     return {
-      id: row[0],
-      provider: row[1],
-      key_name: row[2],
-      key_value: row[3],
-      created_at: row[4],
-      updated_at: row[5]
+      id: row.id,
+      provider: row.provider,
+      key_name: row.key_name,
+      key_value: row.key_value,
+      created_at: row.created_at,
+      updated_at: row.updated_at
     };
   }
 
   static createApiKey(apiKey: Omit<ApiKey, "id" | "created_at" | "updated_at">): number {
-    const result = db.query(
+    const result = db.execute(
       "INSERT INTO api_keys (provider, key_name, key_value) VALUES (?, ?, ?)",
       [apiKey.provider, apiKey.key_name, apiKey.key_value]
     );
-    return result.lastInsertRowId ?? 0;
+    return result.lastInsertRowId;
   }
 
   static updateApiKey(id: number, apiKey: Partial<ApiKey>): void {
-    const fields = [];
-    const params = [];
+    const fields: string[] = [];
+    const params: any[] = [];
     
     if (apiKey.key_value !== undefined) {
       fields.push("key_value = ?");
@@ -84,45 +85,46 @@ export class DbService {
     if (fields.length === 0) return;
     
     params.push(id);
-    db.query(`UPDATE api_keys SET ${fields.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, params);
+    const sql = `UPDATE api_keys SET ${fields.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+    db.execute(sql, params);
   }
 
   static deleteApiKey(id: number): void {
-    db.query("DELETE FROM api_keys WHERE id = ?", [id]);
+    db.execute("DELETE FROM api_keys WHERE id = ?", [id]);
   }
 
   // Test result operations
   static getTestResults(limit = 50): TestResult[] {
     const results = db.query("SELECT * FROM test_results ORDER BY created_at DESC LIMIT ?", [limit]);
     return results.map((row: any) => ({
-      id: row[0],
-      prompt: row[1],
-      provider: row[2],
-      model: row[3],
-      response_time: row[4],
-      response_text: row[5],
-      status: row[6],
-      created_at: row[7]
+      id: row.id,
+      prompt: row.prompt,
+      provider: row.provider,
+      model: row.model,
+      response_time: row.response_time,
+      response_text: row.response_text,
+      status: row.status,
+      created_at: row.created_at
     }));
   }
 
   static createTestResult(testResult: Omit<TestResult, "id" | "created_at">): number {
-    const result = db.query(
+    const result = db.execute(
       "INSERT INTO test_results (prompt, provider, model, response_time, response_text, status) VALUES (?, ?, ?, ?, ?, ?)",
       [testResult.prompt, testResult.provider, testResult.model, testResult.response_time, testResult.response_text, testResult.status]
     );
-    return result.lastInsertRowId ?? 0;
+    return result.lastInsertRowId;
   }
 
   // Provider operations
   static getProviders(): Provider[] {
     const results = db.query("SELECT * FROM providers");
     return results.map((row: any) => ({
-      id: row[0],
-      name: row[1],
-      base_url: row[2],
-      is_active: Boolean(row[3]),
-      created_at: row[4]
+      id: row.id,
+      name: row.name,
+      base_url: row.base_url,
+      is_active: Boolean(row.is_active),
+      created_at: row.created_at
     }));
   }
 
@@ -132,19 +134,19 @@ export class DbService {
     
     const row = result[0];
     return {
-      id: row[0],
-      name: row[1],
-      base_url: row[2],
-      is_active: Boolean(row[3]),
-      created_at: row[4]
+      id: row.id,
+      name: row.name,
+      base_url: row.base_url,
+      is_active: Boolean(row.is_active),
+      created_at: row.created_at
     };
   }
 
   static createProvider(provider: Omit<Provider, "id" | "created_at">): number {
-    const result = db.query(
+    const result = db.execute(
       "INSERT INTO providers (name, base_url, is_active) VALUES (?, ?, ?)",
       [provider.name, provider.base_url, provider.is_active ? 1 : 0]
     );
-    return result.lastInsertRowId ?? 0;
+    return result.lastInsertRowId;
   }
 }

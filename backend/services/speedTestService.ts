@@ -32,7 +32,11 @@ export class SpeedTestService {
     const apiKeyRecord = DbService.getApiKey("OPENROUTER_API_KEY", "OpenRouter");
     
     if (!apiKeyRecord) {
-      throw new Error("OpenRouter API key not found");
+      throw new Error("OpenRouter API key not found. Please configure your API key in the settings.");
+    }
+
+    if (!apiKeyRecord.key_value || apiKeyRecord.key_value === "your_openrouter_api_key_here" || apiKeyRecord.key_value.trim() === "") {
+      throw new Error("Invalid OpenRouter API key. Please update your API key in the settings with a valid key from https://openrouter.ai/keys");
     }
 
     const service = new OpenRouterService(apiKeyRecord.key_value);
@@ -43,7 +47,7 @@ export class SpeedTestService {
         const openRouterRequest = {
           model,
           messages: [
-            { role: "user", content: request.prompt },
+            { role: "user" as const, content: request.prompt },
           ],
           temperature: request.temperature || 0.7,
           max_tokens: request.max_tokens || 1000,
@@ -104,7 +108,11 @@ export class SpeedTestService {
     const apiKeyRecord = DbService.getApiKey("OPENROUTER_API_KEY", "OpenRouter");
     
     if (!apiKeyRecord) {
-      throw new Error("OpenRouter API key not found");
+      throw new Error("OpenRouter API key not found. Please configure your API key in the settings.");
+    }
+
+    if (!apiKeyRecord.key_value || apiKeyRecord.key_value === "your_openrouter_api_key_here" || apiKeyRecord.key_value.trim() === "") {
+      throw new Error("Invalid OpenRouter API key. Please update your API key in the settings with a valid key from https://openrouter.ai/keys");
     }
 
     const service = new OpenRouterService(apiKeyRecord.key_value);

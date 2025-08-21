@@ -25,31 +25,32 @@ app.use(async (ctx, next) => {
 });
 
 // Root route
-app.use((ctx) => {
-  ctx.response.body = {
-    message: "Welcome to LLM Speed Test API",
-    version: "1.0.0",
-  };
+app.use((ctx, next) => {
+  if (ctx.request.url.pathname === "/") {
+    ctx.response.body = {
+      message: "Welcome to LLM Speed Test API",
+      version: "1.0.0",
+    };
+    return;
+  }
+  return next();
 });
 
 // Health check route
-app.use("/health", (ctx) => {
-  ctx.response.body = {
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-  };
+app.use((ctx, next) => {
+  if (ctx.request.url.pathname === "/health") {
+    ctx.response.body = {
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+    };
+    return;
+  }
+  return next();
 });
 
-// API routes
-app.use("/api/openrouter", openRouterRoutes.routes());
-app.use("/api/openrouter", openRouterRoutes.allowedMethods());
-
-app.use("/api/speed-test", speedTestRoutes.routes());
-app.use("/api/speed-test", speedTestRoutes.allowedMethods());
-
 // Test results route
-app.use("/api/test-results", (ctx) => {
-  if (ctx.request.method === "GET") {
+app.use((ctx, next) => {
+  if (ctx.request.url.pathname === "/api/test-results" && ctx.request.method === "GET") {
     try {
       const limit = parseInt(ctx.request.url.searchParams.get("limit") || "50");
       const results = DbService.getTestResults(limit);
@@ -57,6 +58,7 @@ app.use("/api/test-results", (ctx) => {
         success: true,
         data: results,
       };
+      return;
     } catch (error) {
       console.error("Error fetching test results:", error);
       ctx.response.status = 500;
@@ -64,9 +66,18 @@ app.use("/api/test-results", (ctx) => {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       };
+      return;
     }
   }
+  return next();
 });
+
+// API routes
+app.use(openRouterRoutes.routes());
+app.use(openRouterRoutes.allowedMethods());
+
+app.use(speedTestRoutes.routes());
+app.use(speedTestRoutes.allowedMethods());
 
 // Start the server
 const port = parseInt(Deno.env.get("PORT") || "8000");

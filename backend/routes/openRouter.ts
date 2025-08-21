@@ -2,7 +2,9 @@ import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { OpenRouterService } from "../services/openRouterService.ts";
 import { DbService } from "../services/dbService.ts";
 
-const router = new Router();
+const router = new Router({
+  prefix: "/api/openrouter"
+});
 
 // Get all available models
 router.get("/models", async (ctx) => {
