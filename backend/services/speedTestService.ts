@@ -120,24 +120,25 @@ export class SpeedTestService {
   }
 
   static async getPopularModels(): Promise<string[]> {
+    // Preferred/popular models for quick selection
+    const popularModelIds = [
+      "z-ai/glm-4.5",
+      "z-ai/glm-4.5-air",
+      "deepseek/deepseek-chat-v3.1",
+      "moonshotai/kimi-k2",
+      "qwen/qwen3-coder"
+    ];
+
     try {
       const models = await this.getAvailableModels();
-      
-      // Filter for popular models (this is a simplified approach)
-      const popularModelIds = [
-        "z-ai/glm-4.5",
-        "deepseek/deepseek-chat-v3.1",
-        "moonshotai/kimi-k2",
-        "qwen/qwen3-coder",
-        "z-ai/glm-4.5-air"
-      ];
-
-      return popularModelIds.filter(modelId => 
-        models.some(model => model.id === modelId)
-      );
+      const available = new Set((models || []).map((m: any) => m.id));
+      const filtered = popularModelIds.filter((id) => available.has(id));
+      // If none of the predefined IDs are available, fall back to the predefined list
+      return filtered.length > 0 ? filtered : popularModelIds;
     } catch (error) {
       console.error("Error getting popular models:", error);
-      return [];
+      // On error (e.g., missing/invalid API key), still return the predefined list
+      return popularModelIds;
     }
   }
 }

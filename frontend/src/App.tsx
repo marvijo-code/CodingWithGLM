@@ -1,36 +1,27 @@
 import { ThemeProvider } from '@/components/theme-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { SpeedTestInterface } from '@/components/SpeedTestInterface'
-import { BrainCircuit } from 'lucide-react'
 
 function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
-        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto flex h-16 items-center px-4">
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <BrainCircuit className="h-8 w-8 text-primary" />
-                <div className="absolute -inset-1 bg-primary/20 blur-xl rounded-full opacity-50" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                  LLM Speed Arena
-                </h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">
-                  AI Model Performance Benchmarking
-                </p>
-              </div>
+      <div className="h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#0d0d0d] transition-colors">
+        <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-white dark:bg-[#171717] border-gray-200 dark:border-gray-800 px-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <div className="w-5 h-5 bg-white rounded-sm" />
             </div>
-            <div className="flex flex-1 items-center justify-end space-x-2">
-              <nav className="flex items-center space-x-1">
-                <ThemeToggle />
-              </nav>
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                LLM Speed Test
+              </h1>
             </div>
           </div>
+          <div className="flex items-center space-x-2">
+            <ThemeToggle />
+          </div>
         </header>
-        <main className="container mx-auto py-8 px-4">
+        <main className="flex-1 overflow-hidden">
           <SpeedTestInterface />
         </main>
       </div>
