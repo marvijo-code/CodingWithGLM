@@ -35,8 +35,11 @@ export class SpeedTestService {
       throw new Error("OpenRouter API key not found. Please configure your API key in the settings.");
     }
 
-    if (!apiKeyRecord.key_value || apiKeyRecord.key_value === "your_openrouter_api_key_here" || apiKeyRecord.key_value.trim() === "") {
-      throw new Error("Invalid OpenRouter API key. Please update your API key in the settings with a valid key from https://openrouter.ai/keys");
+    if (!apiKeyRecord.key_value || 
+        apiKeyRecord.key_value === "your_openrouter_api_key_here" || 
+        apiKeyRecord.key_value.trim() === "" ||
+        apiKeyRecord.key_value.startsWith("sk-or-") === false) {
+      throw new Error("Invalid OpenRouter API key. Please update your API key in the settings with a valid key from https://openrouter.ai/keys. Expected format: sk-or-...");
     }
 
     const service = new OpenRouterService(apiKeyRecord.key_value);
@@ -111,8 +114,11 @@ export class SpeedTestService {
       throw new Error("OpenRouter API key not found. Please configure your API key in the settings.");
     }
 
-    if (!apiKeyRecord.key_value || apiKeyRecord.key_value === "your_openrouter_api_key_here" || apiKeyRecord.key_value.trim() === "") {
-      throw new Error("Invalid OpenRouter API key. Please update your API key in the settings with a valid key from https://openrouter.ai/keys");
+    if (!apiKeyRecord.key_value || 
+        apiKeyRecord.key_value === "your_openrouter_api_key_here" || 
+        apiKeyRecord.key_value.trim() === "" ||
+        apiKeyRecord.key_value.startsWith("sk-or-") === false) {
+      throw new Error("Invalid OpenRouter API key. Please update your API key in the settings with a valid key from https://openrouter.ai/keys. Expected format: sk-or-...");
     }
 
     const service = new OpenRouterService(apiKeyRecord.key_value);
