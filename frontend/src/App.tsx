@@ -2,6 +2,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { SpeedTestInterface } from '@/components/SpeedTestInterface'
 import { Badge } from '@/components/ui/badge'
+import { Toaster } from '@/components/ui/toaster'
 import { Activity, Zap } from 'lucide-react'
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
         <main className="flex-1 overflow-hidden">
           <SpeedTestInterface />
         </main>
+        <Toaster />
       </div>
     </ThemeProvider>
   )

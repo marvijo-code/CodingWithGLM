@@ -8,7 +8,7 @@ const router = new Router({
 // Run speed test
 router.post("/run", async (ctx) => {
   try {
-    const { prompt, models, temperature = 0.7, max_tokens = 1000 } = await ctx.request.body.json();
+    const { prompt, models, temperature = 0.7, max_tokens = 1000 } = await ctx.request.body().value;
     
     if (!prompt || !models || !Array.isArray(models) || models.length === 0) {
       ctx.response.status = 400;

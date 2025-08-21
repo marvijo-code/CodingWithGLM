@@ -55,7 +55,14 @@ class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // Try to parse error response body for better error messages
+      try {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      } catch (parseError) {
+        // If parsing fails, fall back to status-based error
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
     }
 
     return await response.json();

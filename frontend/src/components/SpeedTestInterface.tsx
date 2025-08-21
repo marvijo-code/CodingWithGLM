@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
+import { useToast } from '@/hooks/use-toast'
 import { 
   Loader2, 
   Zap, 
@@ -52,6 +53,7 @@ interface StreamingResult {
 }
 
 export function SpeedTestInterface() {
+  const { toast } = useToast();
   const [prompt, setPrompt] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [streamingResults, setStreamingResults] = useState<StreamingResult[]>([]);
@@ -81,6 +83,11 @@ export function SpeedTestInterface() {
       } catch (error) {
         console.error('Error checking API key status:', error);
         setShowApiKeyInput(true);
+        toast({
+          variant: "destructive",
+          title: "Connection Error",
+          description: "Failed to check API key status. Please check your connection."
+        });
       }
     };
 
@@ -97,6 +104,11 @@ export function SpeedTestInterface() {
       }
     } catch (error) {
       console.error('Error loading popular models:', error);
+      toast({
+        variant: "destructive",
+        title: "Failed to Load Models",
+        description: "Could not fetch available models. Please check your API key."
+      });
     }
   };
 
@@ -114,10 +126,19 @@ export function SpeedTestInterface() {
         setShowApiKeyInput(false);
         setApiKey('');
       } else {
-        console.error('Error saving API key:', response.error);
+        toast({
+          variant: "destructive",
+          title: "API Key Error",
+          description: response.error || "Failed to save API key"
+        });
       }
     } catch (error) {
       console.error('Error saving API key:', error);
+      toast({
+        variant: "destructive",
+        title: "Connection Error",
+        description: "Failed to save API key. Please try again."
+      });
     }
   };
 
@@ -154,10 +175,22 @@ export function SpeedTestInterface() {
         }));
         setStreamingResults(finalResults);
       } else {
-        console.error('Speed test failed:', response.error);
+        toast({
+          variant: "destructive",
+          title: "Speed Test Failed",
+          description: response.error || "Unknown error occurred during speed test"
+        });
       }
     } catch (error) {
       console.error('Error running speed test:', error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      toast({
+        variant: "destructive",
+        title: "Speed Test Error",
+        description: errorMessage.includes('500') 
+          ? "Server error. Please check your API key configuration."
+          : errorMessage
+      });
     } finally {
       setIsRunning(false);
     }
@@ -246,13 +279,16 @@ export function SpeedTestInterface() {
                     onClick={handleRunTest}
                     disabled={!prompt.trim() || selectedModels.length === 0 || isRunning}
                     size="lg"
-                    className="w-32"
+                    className="w-36 h-12 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 font-semibold"
                   >
                     {isRunning ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Running...
+                      </>
                     ) : (
                       <>
-                        <Play className="mr-2 h-4 w-4" />
+                        <Play className="mr-2 h-5 w-5" />
                         Run Test
                       </>
                     )}
@@ -273,18 +309,23 @@ export function SpeedTestInterface() {
                   return (
                     <button
                       key={model}
-                      className={`flex-shrink-0 px-3 py-2 rounded-lg border text-sm transition-all ${
+                      className={`flex-shrink-0 px-4 py-3 rounded-xl border-2 text-sm transition-all duration-200 transform hover:scale-105 ${
                         isSelected 
-                          ? 'bg-primary text-primary-foreground border-primary' 
+                          ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/25' 
                           : isDisabled
-                          ? 'opacity-50 cursor-not-allowed border-muted'
-                          : 'hover:bg-muted border-muted'
+                          ? 'opacity-50 cursor-not-allowed border-muted-foreground/20'
+                          : 'hover:bg-muted border-muted-foreground/30 hover:border-primary/50 hover:shadow-md'
                       }`}
                       onClick={() => !isDisabled && toggleModelSelection(model)}
                     >
                       <div className="text-center">
-                        <div className="font-medium">{modelName}</div>
-                        <div className="text-xs opacity-70">{provider}</div>
+                        <div className="font-semibold">{modelName}</div>
+                        <div className="text-xs opacity-70 mt-1">{provider}</div>
+                        {isSelected && (
+                          <div className="mt-1">
+                            <CheckCircle2 className="h-3 w-3 mx-auto" />
+                          </div>
+                        )}
                       </div>
                     </button>
                   );
