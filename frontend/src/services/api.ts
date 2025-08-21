@@ -28,6 +28,19 @@ export interface SpeedTestComparison {
   totalTime: number;
 }
 
+export interface StreamingEvent {
+  type: 'start' | 'chunk' | 'complete' | 'error' | 'metrics';
+  model?: string;
+  content?: string;
+  reasoningContent?: string;
+  error?: string;
+  latency?: number;
+  tokensPerSecond?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+  firstTokenTime?: number;
+}
+
 export interface TestResult {
   id?: number;
   prompt: string;
@@ -112,7 +125,7 @@ class ApiService {
   }
 
   async getTestHistory(limit = 20) {
-    return this.request<TestResult[]>('/api/speed-test/history', {
+    return this.request<TestResult[]>(`/api/speed-test/history?limit=${limit}`, {
       method: 'GET',
     });
   }
@@ -123,6 +136,61 @@ class ApiService {
 
   async getPopularModels() {
     return this.request('/api/speed-test/popular-models');
+  }
+
+  // Streaming speed test
+  async runStreamingSpeedTest(
+    request: SpeedTestRequest,
+    onEvent: (event: StreamingEvent) => void
+  ): Promise<void> {
+    const url = `${API_BASE_URL}/api/speed-test/run-stream`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body reader available');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            
+            try {
+              const event: StreamingEvent = JSON.parse(data);
+              onEvent(event);
+            } catch (e) {
+              console.warn('Failed to parse streaming event:', data);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   // Test results endpoint

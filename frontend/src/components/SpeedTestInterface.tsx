@@ -18,10 +18,12 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  ArrowDown,
+  Activity
 } from 'lucide-react';
 import { apiService } from '@/services/api';
-import type { SpeedTestComparison } from '@/services/api';
+import type { SpeedTestComparison, StreamingEvent } from '@/services/api';
 
 interface ApiKeyStatusResponse {
   hasApiKey: boolean;
@@ -50,6 +52,10 @@ interface StreamingResult {
   responseTime?: number;
   tokens?: number;
   reasoningTokens?: number;
+  latency?: number;
+  tokensPerSecond?: number;
+  firstTokenTime?: number;
+  isStreaming?: boolean;
 }
 
 export function SpeedTestInterface() {
@@ -63,6 +69,7 @@ export function SpeedTestInterface() {
   const [apiKey, setApiKey] = useState('');
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [, setApiKeyStatus] = useState(false);
+  const [showGuidance, setShowGuidance] = useState(true);
 
   useEffect(() => {
     // Set random prompt on load
@@ -147,42 +154,88 @@ export function SpeedTestInterface() {
     
     setIsRunning(true);
     setResults(null);
+    setShowGuidance(false);
     
     // Initialize streaming results
     const initialResults: StreamingResult[] = selectedModels.map(model => ({
       model,
       content: '',
-      isComplete: false
+      isComplete: false,
+      isStreaming: false
     }));
     setStreamingResults(initialResults);
     
     try {
-      const response = await apiService.runSpeedTest({
+      await apiService.runStreamingSpeedTest({
         prompt: prompt.trim(),
         models: selectedModels
-      });
-      
-      if (response.success && response.data) {
-        setResults(response.data);
-        // Update streaming results with final data
-        const finalResults = response.data.results.map(result => ({
-          model: result.model,
-          content: result.response?.choices?.[0]?.message?.content || 'No response generated',
-          isComplete: true,
-          error: result.error || undefined,
-          responseTime: result.responseTime,
-          tokens: result.response?.usage?.total_tokens
-        }));
-        setStreamingResults(finalResults);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Speed Test Failed",
-          description: response.error || "Unknown error occurred during speed test"
+      }, (event: StreamingEvent) => {
+        setStreamingResults(prev => {
+          const updated = [...prev];
+          const modelIndex = updated.findIndex(r => r.model === event.model);
+          
+          if (modelIndex === -1) return prev;
+          
+          const current = updated[modelIndex];
+          
+          switch (event.type) {
+            case 'start':
+              updated[modelIndex] = {
+                ...current,
+                isStreaming: true,
+                content: '',
+                reasoningContent: ''
+              };
+              break;
+              
+            case 'chunk':
+              if (event.content) {
+                updated[modelIndex] = {
+                  ...current,
+                  content: current.content + event.content
+                };
+              }
+              if (event.reasoningContent) {
+                updated[modelIndex] = {
+                  ...current,
+                  reasoningContent: (current.reasoningContent || '') + event.reasoningContent
+                };
+              }
+              break;
+              
+            case 'metrics':
+              updated[modelIndex] = {
+                ...current,
+                latency: event.latency,
+                tokensPerSecond: event.tokensPerSecond,
+                firstTokenTime: event.firstTokenTime,
+                tokens: event.totalTokens
+              };
+              break;
+              
+            case 'complete':
+              updated[modelIndex] = {
+                ...current,
+                isComplete: true,
+                isStreaming: false
+              };
+              break;
+              
+            case 'error':
+              updated[modelIndex] = {
+                ...current,
+                error: event.error,
+                isComplete: true,
+                isStreaming: false
+              };
+              break;
+          }
+          
+          return updated;
         });
-      }
+      });
     } catch (error) {
-      console.error('Error running speed test:', error);
+      console.error('Error running streaming speed test:', error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       toast({
         variant: "destructive",
@@ -204,18 +257,15 @@ export function SpeedTestInterface() {
         if (prev.length >= 3) {
           return prev; // Limit to 3 models
         }
-        return [...prev, modelId];
+        const newSelection = [...prev, modelId];
+        if (newSelection.length === 3) {
+          setShowGuidance(false);
+        }
+        return newSelection;
       }
     });
   };
 
-  const formatResponseTime = (ms: number) => {
-    if (ms < 1000) {
-      return `${ms}ms`;
-    } else {
-      return `${(ms / 1000).toFixed(2)}s`;
-    }
-  };
 
 
   return (
@@ -300,36 +350,50 @@ export function SpeedTestInterface() {
               </div>
               
               {/* Model Selection - Horizontal */}
-              <div className="flex items-center space-x-2 overflow-x-auto pb-2">
-                {popularModels.slice(0, 8).map((model) => {
-                  const isSelected = selectedModels.includes(model);
-                  const [provider, modelName] = model.split('/');
-                  const isDisabled = selectedModels.length >= 3 && !isSelected;
-                  
-                  return (
-                    <button
-                      key={model}
-                      className={`flex-shrink-0 px-4 py-3 rounded-xl border-2 text-sm transition-all duration-200 transform hover:scale-105 ${
-                        isSelected 
-                          ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/25' 
-                          : isDisabled
-                          ? 'opacity-50 cursor-not-allowed border-muted-foreground/20'
-                          : 'hover:bg-muted border-muted-foreground/30 hover:border-primary/50 hover:shadow-md'
-                      }`}
-                      onClick={() => !isDisabled && toggleModelSelection(model)}
-                    >
-                      <div className="text-center">
-                        <div className="font-semibold">{modelName}</div>
-                        <div className="text-xs opacity-70 mt-1">{provider}</div>
-                        {isSelected && (
-                          <div className="mt-1">
-                            <CheckCircle2 className="h-3 w-3 mx-auto" />
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+              <div className="relative">
+                {/* Usage Guidance */}
+                {showGuidance && selectedModels.length < 3 && (
+                  <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 z-10">
+                    <div className="bg-primary text-primary-foreground px-3 py-1 rounded-lg text-sm font-medium animate-bounce">
+                      Select 3 LLMs here
+                    </div>
+                    <div className="flex justify-center mt-1">
+                      <ArrowDown className="h-4 w-4 text-primary animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex items-center space-x-2 overflow-x-auto pb-2">
+                  {popularModels.slice(0, 8).map((model) => {
+                    const isSelected = selectedModels.includes(model);
+                    const [provider, modelName] = model.split('/');
+                    const isDisabled = selectedModels.length >= 3 && !isSelected;
+                    
+                    return (
+                      <button
+                        key={model}
+                        className={`flex-shrink-0 px-4 py-3 rounded-xl border-2 text-sm transition-all duration-200 transform hover:scale-105 ${
+                          isSelected 
+                            ? 'bg-primary text-primary-foreground border-white shadow-lg shadow-primary/25 ring-2 ring-white ring-offset-2' 
+                            : isDisabled
+                            ? 'opacity-50 cursor-not-allowed border-muted-foreground/20'
+                            : 'hover:bg-muted border-muted-foreground/30 hover:border-primary/50 hover:shadow-md'
+                        }`}
+                        onClick={() => !isDisabled && toggleModelSelection(model)}
+                      >
+                        <div className="text-center">
+                          <div className="font-semibold">{modelName}</div>
+                          <div className="text-xs opacity-70 mt-1">{provider}</div>
+                          {isSelected && (
+                            <div className="mt-1">
+                              <CheckCircle2 className="h-3 w-3 mx-auto" />
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
@@ -360,7 +424,7 @@ export function SpeedTestInterface() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             <span className="font-medium text-sm">{modelName}</span>
-                            {isRunning && !isComplete && (
+                            {streamResult?.isStreaming && (
                               <Loader2 className="h-3 w-3 animate-spin text-primary" />
                             )}
                             {isComplete && !hasError && (
@@ -374,11 +438,19 @@ export function SpeedTestInterface() {
                             <Badge variant="outline" className="text-xs px-1">
                               {provider}
                             </Badge>
-                            {streamResult?.responseTime && (
-                              <span className="flex items-center space-x-1">
+                            {streamResult?.latency && (
+                              <span className="flex items-center space-x-1" title="Latency to first token">
                                 <Clock className="h-2.5 w-2.5" />
                                 <span className="font-mono">
-                                  {formatResponseTime(streamResult.responseTime)}
+                                  {streamResult.latency}ms
+                                </span>
+                              </span>
+                            )}
+                            {streamResult?.tokensPerSecond && (
+                              <span className="flex items-center space-x-1" title="Tokens per second">
+                                <Activity className="h-2.5 w-2.5" />
+                                <span className="font-mono">
+                                  {streamResult.tokensPerSecond.toFixed(1)}/s
                                 </span>
                               </span>
                             )}
@@ -406,7 +478,7 @@ export function SpeedTestInterface() {
                                   </div>
                                   <div className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
                                     {streamResult.reasoningContent}
-                                    {isRunning && !isComplete && (
+                                    {streamResult?.isStreaming && (
                                       <span className="inline-block w-0.5 h-3 bg-blue-500 animate-pulse ml-1" />
                                     )}
                                   </div>
@@ -423,16 +495,23 @@ export function SpeedTestInterface() {
                                   )}
                                   <div className="whitespace-pre-wrap">
                                     {streamResult.content}
-                                    {isRunning && !isComplete && (
+                                    {streamResult?.isStreaming && (
                                       <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-1" />
                                     )}
+                                  </div>
+                                </div>
+                              ) : streamResult?.isStreaming ? (
+                                <div className="flex items-center justify-center h-32 text-muted-foreground">
+                                  <div className="flex items-center space-x-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span className="text-sm">Generating...</span>
                                   </div>
                                 </div>
                               ) : isRunning ? (
                                 <div className="flex items-center justify-center h-32 text-muted-foreground">
                                   <div className="flex items-center space-x-2">
                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span className="text-sm">Generating...</span>
+                                    <span className="text-sm">Starting...</span>
                                   </div>
                                 </div>
                               ) : (
@@ -449,18 +528,32 @@ export function SpeedTestInterface() {
                       </div>
                       
                       {/* Footer Stats */}
-                      {isComplete && streamResult?.tokens && (
+                      {(streamResult?.tokens || streamResult?.tokensPerSecond || streamResult?.latency) && (
                         <div className="flex-shrink-0 border-t p-2 bg-muted/20">
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <div>
-                              <div>Total: {streamResult.tokens}</div>
+                            <div className="space-y-1">
+                              {streamResult.tokens && (
+                                <div>Tokens: {streamResult.tokens}</div>
+                              )}
                               {streamResult.reasoningTokens && (
                                 <div className="text-blue-600 dark:text-blue-400">
                                   Reasoning: {streamResult.reasoningTokens}
                                 </div>
                               )}
+                              {streamResult.tokensPerSecond && (
+                                <div className="text-green-600 dark:text-green-400">
+                                  Speed: {streamResult.tokensPerSecond.toFixed(1)} tok/s
+                                </div>
+                              )}
+                              {streamResult.latency && (
+                                <div className="text-orange-600 dark:text-orange-400">
+                                  Latency: {streamResult.latency}ms
+                                </div>
+                              )}
                             </div>
-                            <CheckCircle2 className="h-3 w-3 text-green-500" />
+                            {isComplete && (
+                              <CheckCircle2 className="h-3 w-3 text-green-500" />
+                            )}
                           </div>
                         </div>
                       )}

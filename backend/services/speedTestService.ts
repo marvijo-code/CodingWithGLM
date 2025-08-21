@@ -1,4 +1,4 @@
-import { OpenRouterService } from "./openRouterService.ts";
+import { OpenRouterService, StreamChunk } from "./openRouterService.ts";
 import { DbService } from "./dbService.ts";
 
 export interface SpeedTestRequest {
@@ -21,6 +21,19 @@ export interface SpeedTestComparison {
   startTime: number;
   endTime: number;
   totalTime: number;
+}
+
+export interface StreamingEvent {
+  type: 'start' | 'chunk' | 'complete' | 'error' | 'metrics';
+  model?: string;
+  content?: string;
+  reasoningContent?: string;
+  error?: string;
+  latency?: number;
+  tokensPerSecond?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+  firstTokenTime?: number;
 }
 
 export class SpeedTestService {
@@ -146,5 +159,119 @@ export class SpeedTestService {
       // On error (e.g., missing/invalid API key), still return the predefined list
       return popularModelIds;
     }
+  }
+
+  static async runStreamingSpeedTest(
+    request: SpeedTestRequest, 
+    onEvent: (event: StreamingEvent) => void
+  ): Promise<void> {
+    const apiKeyRecord = DbService.getApiKey("OPENROUTER_API_KEY", "OpenRouter");
+    
+    if (!apiKeyRecord || !apiKeyRecord.key_value || 
+        apiKeyRecord.key_value === "your_openrouter_api_key_here" || 
+        apiKeyRecord.key_value.trim() === "" ||
+        (!apiKeyRecord.key_value.startsWith("sk-or-") && !apiKeyRecord.key_value.startsWith("sk-"))) {
+      onEvent({
+        type: 'error',
+        error: "Invalid OpenRouter API key. Please update your API key."
+      });
+      return;
+    }
+
+    const service = new OpenRouterService(apiKeyRecord.key_value);
+    
+    // Process models in parallel
+    const promises = request.models.map(async (model) => {
+      const startTime = Date.now();
+      let firstTokenTime: number | null = null;
+      let tokenCount = 0;
+      let content = "";
+      let reasoningContent = "";
+      
+      onEvent({
+        type: 'start',
+        model
+      });
+      
+      try {
+        const openRouterRequest = {
+          model,
+          messages: [{ role: "user" as const, content: request.prompt }],
+          temperature: request.temperature || 0.7,
+          max_tokens: request.max_tokens || 1000,
+        };
+
+        await service.generateStreamingCompletion(
+          openRouterRequest,
+          model,
+          (chunk: StreamChunk) => {
+            const now = Date.now();
+            
+            // Track first token time
+            if (firstTokenTime === null && (chunk.choices?.[0]?.delta?.content || chunk.choices?.[0]?.delta?.reasoning_content)) {
+              firstTokenTime = now;
+              const latency = now - startTime;
+              
+              onEvent({
+                type: 'metrics',
+                model,
+                latency,
+                firstTokenTime: latency
+              });
+            }
+            
+            // Process content chunks
+            if (chunk.choices?.[0]?.delta?.content) {
+              content += chunk.choices[0].delta.content;
+              tokenCount++;
+              
+              onEvent({
+                type: 'chunk',
+                model,
+                content: chunk.choices[0].delta.content
+              });
+            }
+            
+            // Process reasoning chunks
+            if (chunk.choices?.[0]?.delta?.reasoning_content) {
+              reasoningContent += chunk.choices[0].delta.reasoning_content;
+              
+              onEvent({
+                type: 'chunk',
+                model,
+                reasoningContent: chunk.choices[0].delta.reasoning_content
+              });
+            }
+            
+            // Calculate tokens per second
+            if (firstTokenTime && tokenCount > 0) {
+              const elapsed = (now - firstTokenTime) / 1000;
+              const tokensPerSecond = elapsed > 0 ? tokenCount / elapsed : 0;
+              
+              onEvent({
+                type: 'metrics',
+                model,
+                tokensPerSecond,
+                totalTokens: tokenCount
+              });
+            }
+          }
+        );
+        
+        onEvent({
+          type: 'complete',
+          model
+        });
+        
+      } catch (error) {
+        onEvent({
+          type: 'error',
+          model,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    });
+    
+    await Promise.all(promises);
   }
 }
