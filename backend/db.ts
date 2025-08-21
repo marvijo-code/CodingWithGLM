@@ -3,9 +3,40 @@ interface DatabaseRow {
   [key: string]: any;
 }
 
+interface RunHistory {
+  id: number;
+  prompt: string;
+  models: string[];
+  results: {
+    model: string;
+    content: string;
+    reasoningContent?: string;
+    responseTime?: number;
+    tokens?: number;
+    reasoningTokens?: number;
+    latency?: number;
+    tokensPerSecond?: number;
+    firstTokenTime?: number;
+    error?: string;
+  }[];
+  created_at: string;
+}
+
+interface RunStats {
+  model: string;
+  avgResponseTime: number;
+  avgTokensPerSecond: number;
+  avgLatency: number;
+  totalRuns: number;
+  successRate: number;
+  avgTokens: number;
+  avgReasoningTokens: number;
+}
+
 class InMemoryDB {
   private apiKeys: any[] = [];
   private testResults: any[] = [];
+  private runHistory: RunHistory[] = [];
   private providers: any[] = [
     {
       id: 1,
@@ -18,7 +49,8 @@ class InMemoryDB {
   private nextId = {
     apiKeys: 1,
     testResults: 1,
-    providers: 2
+    providers: 2,
+    runHistory: 1
   };
 
   constructor() {
@@ -127,6 +159,27 @@ class InMemoryDB {
       const name = params[0];
       return this.providers.filter(p => p.name === name) as T[];
     }
+
+    if (sql.includes("SELECT * FROM run_history")) {
+      const limit = params[0] || 50;
+      const offset = params[1] || 0;
+      return [...this.runHistory]
+        .reverse()
+        .slice(offset, offset + limit) as T[];
+    }
+
+    if (sql.includes("SELECT * FROM run_history WHERE created_at")) {
+      const [startDate, endDate, limit] = params;
+      return this.runHistory
+        .filter(r => {
+          const createdAt = new Date(r.created_at);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          return createdAt >= start && createdAt <= end;
+        })
+        .reverse()
+        .slice(0, limit || 50) as T[];
+    }
     
     return [];
   }
@@ -183,6 +236,19 @@ class InMemoryDB {
       return { lastInsertRowId: 0, changes: originalLength - this.apiKeys.length };
     }
 
+    if (sql.includes("INSERT INTO run_history")) {
+      const [prompt, models, results] = params;
+      const newRun: RunHistory = {
+        id: this.nextId.runHistory++,
+        prompt,
+        models: JSON.parse(models),
+        results: JSON.parse(results),
+        created_at: new Date().toISOString()
+      };
+      this.runHistory.push(newRun);
+      return { lastInsertRowId: newRun.id, changes: 1 };
+    }
+
     return { lastInsertRowId: 0, changes: 0 };
   }
 
@@ -207,8 +273,107 @@ class InMemoryDB {
       this.apiKeys[keyIndex].updated_at = new Date().toISOString();
     }
   }
+
+  // Run history methods
+  saveRunHistory(prompt: string, models: string[], results: any[]): number {
+    const newRun: RunHistory = {
+      id: this.nextId.runHistory++,
+      prompt,
+      models,
+      results,
+      created_at: new Date().toISOString()
+    };
+    this.runHistory.push(newRun);
+    return newRun.id;
+  }
+
+  getRunHistory(limit: number = 50, offset: number = 0): RunHistory[] {
+    return [...this.runHistory]
+      .reverse()
+      .slice(offset, offset + limit);
+  }
+
+  getRunHistoryByDateRange(startDate: string, endDate: string, limit: number = 50): RunHistory[] {
+    return this.runHistory
+      .filter(r => {
+        const createdAt = new Date(r.created_at);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        return createdAt >= start && createdAt <= end;
+      })
+      .reverse()
+      .slice(0, limit);
+  }
+
+  getRunStats(startDate?: string, endDate?: string): RunStats[] {
+    let filteredRuns = this.runHistory;
+    
+    if (startDate && endDate) {
+      filteredRuns = this.getRunHistoryByDateRange(startDate, endDate, 1000);
+    }
+
+    const modelStats = new Map<string, {
+      responseTimes: number[];
+      tokensPerSecond: number[];
+      latencies: number[];
+      tokens: number[];
+      reasoningTokens: number[];
+      totalRuns: number;
+      successfulRuns: number;
+    }>();
+
+    filteredRuns.forEach(run => {
+      run.results.forEach(result => {
+        if (!modelStats.has(result.model)) {
+          modelStats.set(result.model, {
+            responseTimes: [],
+            tokensPerSecond: [],
+            latencies: [],
+            tokens: [],
+            reasoningTokens: [],
+            totalRuns: 0,
+            successfulRuns: 0
+          });
+        }
+
+        const stats = modelStats.get(result.model)!;
+        stats.totalRuns++;
+
+        if (!result.error) {
+          stats.successfulRuns++;
+          if (result.responseTime) stats.responseTimes.push(result.responseTime);
+          if (result.tokensPerSecond) stats.tokensPerSecond.push(result.tokensPerSecond);
+          if (result.latency) stats.latencies.push(result.latency);
+          if (result.tokens) stats.tokens.push(result.tokens);
+          if (result.reasoningTokens) stats.reasoningTokens.push(result.reasoningTokens);
+        }
+      });
+    });
+
+    return Array.from(modelStats.entries()).map(([model, stats]) => ({
+      model,
+      avgResponseTime: stats.responseTimes.length > 0 
+        ? stats.responseTimes.reduce((a, b) => a + b, 0) / stats.responseTimes.length 
+        : 0,
+      avgTokensPerSecond: stats.tokensPerSecond.length > 0 
+        ? stats.tokensPerSecond.reduce((a, b) => a + b, 0) / stats.tokensPerSecond.length 
+        : 0,
+      avgLatency: stats.latencies.length > 0 
+        ? stats.latencies.reduce((a, b) => a + b, 0) / stats.latencies.length 
+        : 0,
+      avgTokens: stats.tokens.length > 0 
+        ? stats.tokens.reduce((a, b) => a + b, 0) / stats.tokens.length 
+        : 0,
+      avgReasoningTokens: stats.reasoningTokens.length > 0 
+        ? stats.reasoningTokens.reduce((a, b) => a + b, 0) / stats.reasoningTokens.length 
+        : 0,
+      totalRuns: stats.totalRuns,
+      successRate: stats.totalRuns > 0 ? (stats.successfulRuns / stats.totalRuns) * 100 : 0
+    }));
+  }
 }
 
 const db = new InMemoryDB();
 
 export default db;
+export type { RunHistory, RunStats };

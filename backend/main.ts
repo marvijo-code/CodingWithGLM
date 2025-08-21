@@ -2,6 +2,7 @@ import { Application } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 import openRouterRoutes from "./routes/openRouter.ts";
 import speedTestRoutes from "./routes/speedTest.ts";
+import { saveRunHistory, getRunHistory, getRunStats } from "./routes/runHistory.ts";
 import { DbService } from "./services/dbService.ts";
 
 const app = new Application();
@@ -68,6 +69,29 @@ app.use((ctx, next) => {
       };
       return;
     }
+  }
+  return next();
+});
+
+// Run history routes
+app.use(async (ctx, next) => {
+  if (ctx.request.url.pathname === "/api/run-history" && ctx.request.method === "POST") {
+    const response = await saveRunHistory(ctx.request);
+    ctx.response.status = response.status;
+    ctx.response.body = await response.json();
+    return;
+  }
+  if (ctx.request.url.pathname === "/api/run-history" && ctx.request.method === "GET") {
+    const response = await getRunHistory(ctx.request);
+    ctx.response.status = response.status;
+    ctx.response.body = await response.json();
+    return;
+  }
+  if (ctx.request.url.pathname === "/api/run-stats" && ctx.request.method === "GET") {
+    const response = await getRunStats(ctx.request);
+    ctx.response.status = response.status;
+    ctx.response.body = await response.json();
+    return;
   }
   return next();
 });

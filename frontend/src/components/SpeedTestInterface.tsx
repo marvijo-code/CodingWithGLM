@@ -4,9 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Separator } from '@/components/ui/separator'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
 import { useToast } from '@/hooks/use-toast'
 import { 
   Loader2, 
@@ -20,7 +19,12 @@ import {
   Sparkles,
   TrendingUp,
   ArrowDown,
-  Activity
+  Activity,
+  Code,
+  Database,
+  Globe,
+  Smartphone,
+  BarChart3
 } from 'lucide-react';
 import { apiService } from '@/services/api';
 import type { SpeedTestComparison, StreamingEvent } from '@/services/api';
@@ -29,19 +33,67 @@ interface ApiKeyStatusResponse {
   hasApiKey: boolean;
 }
 
-// Common test prompts for random selection
-const SAMPLE_PROMPTS = [
-  "Write a Python function to implement a binary search algorithm with error handling and comprehensive documentation.",
-  "Explain the concept of recursion and provide a practical example with a recursive function to calculate factorial.",
-  "Create a REST API endpoint in Node.js that handles user authentication with JWT tokens and proper error handling.",
-  "Write a React component that fetches data from an API and displays it in a responsive table with sorting functionality.",
-  "Implement a simple machine learning model using Python to classify text sentiment (positive/negative/neutral).",
-  "Design a database schema for an e-commerce platform including users, products, orders, and relationships.",
-  "Write a comprehensive guide on implementing clean code principles in JavaScript with practical examples.",
-  "Create a CSS animation that smoothly transitions between different states with proper browser compatibility.",
-  "Explain the differences between SQL and NoSQL databases and when to use each approach.",
-  "Write a function that efficiently finds the longest common subsequence between two strings."
-];
+// Programming prompt categories with comprehensive examples
+const PROGRAMMING_PROMPTS = {
+  "Algorithms & Data Structures": {
+    icon: Code,
+    prompts: [
+      "Implement a binary search tree with insert, delete, and search operations in your preferred language.",
+      "Write a function to find the longest common subsequence between two strings using dynamic programming.",
+      "Create a graph traversal algorithm (BFS/DFS) to find the shortest path between two nodes.",
+      "Implement a hash table with collision handling using chaining or open addressing.",
+      "Write a merge sort algorithm and explain its time complexity advantages over bubble sort.",
+      "Create a function to detect cycles in a linked list using Floyd's cycle detection algorithm."
+    ]
+  },
+  "Web Development": {
+    icon: Globe,
+    prompts: [
+      "Build a REST API with authentication, rate limiting, and proper error handling using Node.js/Express.",
+      "Create a responsive React component that fetches and displays paginated data with search functionality.",
+      "Implement a real-time chat application using WebSockets with message persistence.",
+      "Design a secure user authentication system with JWT tokens, refresh tokens, and password hashing.",
+      "Build a progressive web app (PWA) with offline functionality and service worker caching.",
+      "Create a GraphQL API with queries, mutations, and subscriptions for a blog platform."
+    ]
+  },
+  "Database Design": {
+    icon: Database,
+    prompts: [
+      "Design a normalized database schema for an e-commerce platform with users, products, orders, and inventory.",
+      "Write complex SQL queries to analyze sales data including joins, subqueries, and window functions.",
+      "Create a database migration strategy for a production system with zero downtime.",
+      "Design a data warehouse schema for analytics with fact and dimension tables.",
+      "Implement database indexing strategies to optimize query performance for a high-traffic application.",
+      "Create a backup and disaster recovery plan for a critical database system."
+    ]
+  },
+  "Mobile Development": {
+    icon: Smartphone,
+    prompts: [
+      "Build a cross-platform mobile app using React Native with navigation and state management.",
+      "Create a native iOS app with Core Data persistence and push notifications.",
+      "Implement offline-first architecture for a mobile app with data synchronization.",
+      "Design a mobile app UI/UX following platform-specific design guidelines (Material Design/Human Interface).",
+      "Build a location-based mobile app with GPS tracking and geofencing capabilities.",
+      "Create a mobile app with camera integration, image processing, and cloud storage."
+    ]
+  },
+  "System Design & Architecture": {
+    icon: BarChart3,
+    prompts: [
+      "Design a scalable microservices architecture for a social media platform handling millions of users.",
+      "Create a distributed caching strategy using Redis for a high-traffic e-commerce site.",
+      "Design a CI/CD pipeline with automated testing, deployment, and rollback capabilities.",
+      "Implement a message queue system for handling asynchronous tasks in a distributed system.",
+      "Design a monitoring and alerting system for a production application with SLA requirements.",
+      "Create a disaster recovery plan for a multi-region cloud infrastructure."
+    ]
+  }
+};
+
+// Get all prompts as a flat array for random selection
+const ALL_PROMPTS = Object.values(PROGRAMMING_PROMPTS).flatMap(category => category.prompts);
 
 interface StreamingResult {
   model: string;
@@ -58,7 +110,11 @@ interface StreamingResult {
   isStreaming?: boolean;
 }
 
-export function SpeedTestInterface() {
+interface SpeedTestInterfaceProps {
+  onShowDashboard?: () => void;
+}
+
+export function SpeedTestInterface({ onShowDashboard }: SpeedTestInterfaceProps) {
   const { toast } = useToast();
   const [prompt, setPrompt] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
@@ -73,7 +129,7 @@ export function SpeedTestInterface() {
 
   useEffect(() => {
     // Set random prompt on load
-    const randomPrompt = SAMPLE_PROMPTS[Math.floor(Math.random() * SAMPLE_PROMPTS.length)];
+    const randomPrompt = ALL_PROMPTS[Math.floor(Math.random() * ALL_PROMPTS.length)];
     setPrompt(randomPrompt);
 
     // Check API key status
@@ -246,6 +302,29 @@ export function SpeedTestInterface() {
       });
     } finally {
       setIsRunning(false);
+      
+      // Save run history after completion
+      if (streamingResults.length > 0) {
+        try {
+          const historyResults = streamingResults.map(result => ({
+            model: result.model,
+            content: result.content,
+            reasoningContent: result.reasoningContent,
+            responseTime: result.responseTime,
+            tokens: result.tokens,
+            reasoningTokens: result.reasoningTokens,
+            latency: result.latency,
+            tokensPerSecond: result.tokensPerSecond,
+            firstTokenTime: result.firstTokenTime,
+            error: result.error
+          }));
+          
+          await apiService.saveRunHistory(prompt.trim(), selectedModels, historyResults);
+        } catch (error) {
+          console.error('Failed to save run history:', error);
+          // Don't show error to user as this is background functionality
+        }
+      }
     }
   };
 
@@ -313,11 +392,64 @@ export function SpeedTestInterface() {
           {/* Top Configuration Panel */}
           <div className="flex-shrink-0 border-b bg-muted/30">
             <div className="p-4 space-y-4">
-              {/* Prompt Input */}
+              {/* Prompt Input with Preset Selection */}
               <div className="flex items-center space-x-4">
-                <div className="flex-1">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-64 justify-between">
+                          <span className="truncate">Choose a programming prompt</span>
+                          <ArrowDown className="ml-2 h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-80 max-h-96 overflow-y-auto">
+                        {Object.entries(PROGRAMMING_PROMPTS).map(([category, { icon: Icon, prompts }]) => (
+                          <div key={category}>
+                            <DropdownMenuLabel className="flex items-center">
+                              <Icon className="mr-2 h-4 w-4" />
+                              {category}
+                            </DropdownMenuLabel>
+                            {prompts.map((promptText, index) => (
+                              <DropdownMenuItem 
+                                key={`${category}-${index}`} 
+                                onClick={() => setPrompt(promptText)}
+                                className="pl-8"
+                              >
+                                <div className="text-sm">
+                                  {promptText.length > 60 ? `${promptText.substring(0, 60)}...` : promptText}
+                                </div>
+                              </DropdownMenuItem>
+                            ))}
+                            <DropdownMenuSeparator />
+                          </div>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const randomPrompt = ALL_PROMPTS[Math.floor(Math.random() * ALL_PROMPTS.length)];
+                        setPrompt(randomPrompt);
+                      }}
+                    >
+                      <Sparkles className="mr-1 h-3 w-3" />
+                      Random
+                    </Button>
+                    {onShowDashboard && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={onShowDashboard}
+                      >
+                        <BarChart3 className="mr-1 h-3 w-3" />
+                        Dashboard
+                      </Button>
+                    )}
+                  </div>
                   <Textarea
-                    placeholder="Enter your test prompt..."
+                    placeholder="Enter your test prompt or select one from the dropdown above..."
                     value={prompt}
                     onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
                     className="min-h-[80px] resize-none text-sm"
@@ -372,9 +504,9 @@ export function SpeedTestInterface() {
                     return (
                       <button
                         key={model}
-                        className={`flex-shrink-0 px-4 py-3 rounded-xl border-2 text-sm transition-all duration-200 transform hover:scale-105 ${
+                        className={`flex-shrink-0 px-4 py-3 rounded-xl border text-sm transition-all duration-200 transform hover:scale-105 ${
                           isSelected 
-                            ? 'bg-primary text-primary-foreground border-white shadow-lg shadow-primary/25 ring-2 ring-white ring-offset-2' 
+                            ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/25' 
                             : isDisabled
                             ? 'opacity-50 cursor-not-allowed border-muted-foreground/20'
                             : 'hover:bg-muted border-muted-foreground/30 hover:border-primary/50 hover:shadow-md'
@@ -468,7 +600,7 @@ export function SpeedTestInterface() {
                             </Alert>
                           </div>
                         ) : (
-                          <ScrollArea className="h-full">
+                          <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
                             <div className="p-4 text-sm leading-relaxed space-y-3">
                               {streamResult?.reasoningContent && (
                                 <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-md border-l-2 border-blue-400">
@@ -523,7 +655,7 @@ export function SpeedTestInterface() {
                                 </div>
                               )}
                             </div>
-                          </ScrollArea>
+                          </div>
                         )}
                       </div>
                       

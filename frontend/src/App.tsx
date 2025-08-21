@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import { ThemeProvider } from '@/components/theme-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { SpeedTestInterface } from '@/components/SpeedTestInterface'
+import { Dashboard } from '@/components/Dashboard'
 import { Badge } from '@/components/ui/badge'
 import { Toaster } from '@/components/ui/toaster'
 import { Activity, Zap } from 'lucide-react'
 
 function App() {
+  const [currentView, setCurrentView] = useState<'arena' | 'dashboard'>('arena');
+
   return (
     <ThemeProvider defaultTheme="system" storageKey="llm-speed-test-theme">
       <div className="h-screen flex flex-col bg-background">
@@ -17,7 +21,7 @@ function App() {
                 <Activity className="h-4 w-4 text-primary-foreground" />
               </div>
               <div className="flex items-center space-x-2">
-                <span className="text-sm font-semibold">LLM Arena</span>
+                <span className="text-sm font-semibold">Ultimate LLM Arena</span>
                 <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
                   <Zap className="mr-1 h-2.5 w-2.5" />
                   Live
@@ -30,7 +34,11 @@ function App() {
 
         {/* Main Content - Full Height */}
         <main className="flex-1 overflow-hidden">
-          <SpeedTestInterface />
+          {currentView === 'arena' ? (
+            <SpeedTestInterface onShowDashboard={() => setCurrentView('dashboard')} />
+          ) : (
+            <Dashboard onBack={() => setCurrentView('arena')} />
+          )}
         </main>
         <Toaster />
       </div>

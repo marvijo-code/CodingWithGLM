@@ -52,6 +52,36 @@ export interface TestResult {
   created_at?: string;
 }
 
+export interface RunHistory {
+  id: number;
+  prompt: string;
+  models: string[];
+  results: {
+    model: string;
+    content: string;
+    reasoningContent?: string;
+    responseTime?: number;
+    tokens?: number;
+    reasoningTokens?: number;
+    latency?: number;
+    tokensPerSecond?: number;
+    firstTokenTime?: number;
+    error?: string;
+  }[];
+  created_at: string;
+}
+
+export interface RunStats {
+  model: string;
+  avgResponseTime: number;
+  avgTokensPerSecond: number;
+  avgLatency: number;
+  totalRuns: number;
+  successRate: number;
+  avgTokens: number;
+  avgReasoningTokens: number;
+}
+
 class ApiService {
   private async request<T>(
     endpoint: string,
@@ -196,6 +226,35 @@ class ApiService {
   // Test results endpoint
   async getTestResults(limit = 50) {
     return this.request<TestResult[]>(`/api/test-results?limit=${limit}`);
+  }
+
+  // Run history endpoints
+  async saveRunHistory(prompt: string, models: string[], results: any[]) {
+    return this.request('/api/run-history', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, models, results }),
+    });
+  }
+
+  async getRunHistory(limit = 50, offset = 0, startDate?: string, endDate?: string) {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+    
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    
+    return this.request<RunHistory[]>(`/api/run-history?${params}`);
+  }
+
+  async getRunStats(startDate?: string, endDate?: string) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    
+    const queryString = params.toString();
+    return this.request<RunStats[]>(`/api/run-stats${queryString ? '?' + queryString : ''}`);
   }
 }
 
