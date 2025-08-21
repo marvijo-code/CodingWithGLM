@@ -1,8 +1,25 @@
 import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, Zap } from 'lucide-react';
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
+import { 
+  Loader2, 
+  Zap, 
+  Trophy, 
+  Clock, 
+  Cpu, 
+  Settings, 
+  Play, 
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  TrendingUp
+} from 'lucide-react';
 import { apiService } from '@/services/api';
 import type { SpeedTestComparison } from '@/services/api';
 
@@ -118,185 +135,302 @@ export function SpeedTestInterface() {
     }
   };
 
-  const getFastestModel = () => {
-    if (!results || results.results.length === 0) return null;
-    
-    const validResults = results.results.filter(r => !r.error);
-    if (validResults.length === 0) return null;
-    
-    return validResults.reduce((fastest, current) => 
-      current.responseTime < fastest.responseTime ? current : fastest
-    );
-  };
-
-  const fastestModel = getFastestModel();
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-3xl">
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <div className="text-center space-y-6">
+        <div className="space-y-2">
+          <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground hover:bg-primary/80">
+            <Sparkles className="mr-1 h-3 w-3" />
+            AI Performance Benchmarking
+          </div>
+          <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
+            LLM Speed Arena
+          </h1>
+          <p className="mx-auto max-w-[700px] text-lg text-muted-foreground sm:text-xl">
+            Compare AI model performance in real-time. Benchmark response times, quality, and efficiency across multiple providers with enterprise-grade precision.
+          </p>
+        </div>
+        
+        <div className="flex items-center justify-center space-x-6">
+          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <span>Real-time Testing</span>
+          </div>
+          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+            <span>Multi-Provider</span>
+          </div>
+          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <div className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
+            <span>Enterprise Ready</span>
+          </div>
+        </div>
+      </div>
 
-      {/* API Key Input */}
+      {/* API Key Setup */}
       {showApiKeyInput && (
-        <div className="w-full max-w-md mx-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <Zap className="w-6 h-6 text-white" />
+        <div className="mx-auto max-w-md">
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="text-center pb-2">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <Settings className="h-6 w-6 text-primary" />
               </div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                Welcome to LLM Speed Test
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Connect your OpenRouter API to start benchmarking AI models
-              </p>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">
-                  API Key
+              <CardTitle className="text-2xl">Get Started</CardTitle>
+              <CardDescription>
+                Connect your OpenRouter API key to unlock AI model benchmarking
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  OpenRouter API Key
                 </label>
                 <Input
                   type="password"
                   placeholder="sk-or-v1-..."
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-600 rounded-md"
+                  className="font-mono"
                 />
               </div>
               <Button 
                 onClick={handleSaveApiKey} 
                 disabled={!apiKey.trim()}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                className="w-full"
+                size="lg"
               >
-                Connect
+                <Zap className="mr-2 h-4 w-4" />
+                Connect & Start Testing
               </Button>
-            </div>
-          </div>
+              <p className="text-xs text-center text-muted-foreground">
+                Your API key is securely stored locally and never shared.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      {/* Speed Test Form */}
+      {/* Main Interface */}
       {!showApiKeyInput && (
-        <div className="w-full max-w-3xl mx-auto space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="p-6 space-y-6">
-              {/* Prompt Input */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  Message
-                </label>
+        <div className="mx-auto max-w-4xl space-y-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Cpu className="h-5 w-5" />
+                <span>Configure Benchmark</span>
+              </CardTitle>
+              <CardDescription>
+                Design your test prompt and select AI models for performance comparison
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Prompt Configuration */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Test Prompt
+                  </label>
+                  <Badge variant="outline" className="text-xs">
+                    {prompt.length}/2000 characters
+                  </Badge>
+                </div>
                 <Textarea
-                  placeholder="Enter your prompt to test AI model performance..."
+                  placeholder="Enter a detailed prompt to benchmark AI models. Example: 'Write a Python function to implement a binary search algorithm with error handling and documentation.'"
                   value={prompt}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
-                  className="min-h-[120px] bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-600 rounded-md text-base"
+                  className="min-h-[120px] resize-none"
+                  maxLength={2000}
                 />
+                <p className="text-xs text-muted-foreground">
+                  💡 Use specific, technical prompts for more meaningful performance comparisons
+                </p>
               </div>
+
+              <Separator />
 
               {/* Model Selection */}
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  Select Models (up to 3)
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {popularModels.map((model) => (
-                    <button
-                      key={model}
-                      type="button"
-                      className={`
-                        p-3 text-left rounded-md border transition-colors
-                        ${selectedModels.includes(model)
-                          ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300'
-                          : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }
-                      `}
-                      onClick={() => toggleModelSelection(model)}
-                    >
-                      <div className="font-medium text-sm">{model.split('/').pop()}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">{model.split('/')[0]}</div>
-                    </button>
-                  ))}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium leading-none">
+                    AI Models
+                  </label>
+                  <Badge variant={selectedModels.length > 0 ? "default" : "secondary"}>
+                    {selectedModels.length}/3 selected
+                  </Badge>
                 </div>
+                
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {popularModels.map((model) => {
+                    const isSelected = selectedModels.includes(model);
+                    const [provider, modelName] = model.split('/');
+                    
+                    return (
+                      <Card 
+                        key={model}
+                        className={`cursor-pointer transition-all hover:shadow-md ${
+                          isSelected 
+                            ? 'ring-2 ring-primary bg-primary/5' 
+                            : 'hover:bg-muted/50'
+                        }`}
+                        onClick={() => toggleModelSelection(model)}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium leading-none">
+                                {modelName}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {provider}
+                              </p>
+                            </div>
+                            <div className={`h-4 w-4 rounded-full border-2 ${
+                              isSelected 
+                                ? 'bg-primary border-primary' 
+                                : 'border-muted-foreground/25'
+                            }`}>
+                              {isSelected && (
+                                <CheckCircle2 className="h-4 w-4 text-primary-foreground" />
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+                
+                {selectedModels.length === 0 && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Select at least one AI model to begin benchmarking.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
 
-              {/* Submit Button */}
+              <Separator />
+
+              {/* Action Button */}
               <Button
                 onClick={handleRunTest}
                 disabled={!prompt.trim() || selectedModels.length === 0 || isRunning}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-md"
+                className="w-full"
+                size="lg"
               >
                 {isRunning ? (
-                  <div className="flex items-center justify-center space-x-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Running test...</span>
-                  </div>
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Benchmarking Models...
+                  </>
                 ) : (
-                  <span>Run Speed Test</span>
+                  <>
+                    <Play className="mr-2 h-4 w-4" />
+                    Start Performance Test
+                  </>
                 )}
               </Button>
-            </div>
-          </div>
-        </div>
-      )}
+            </CardContent>
+          </Card>
 
-      {/* Results */}
-      {results && (
-        <div className="w-full max-w-3xl mx-auto space-y-4">
-          <div className="text-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Results
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Completed in {formatResponseTime(results.totalTime)}
-            </p>
-          </div>
           
-          <div className="space-y-4">
-            {results.results.map((result) => (
-              <div key={result.model} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                        {result.model.split('/').pop()}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {formatResponseTime(result.responseTime)}
-                        {result.model === fastestModel?.model && (
-                          <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
-                            🏆 Fastest
-                          </span>
+          {/* Results Section */}
+          {results && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <TrendingUp className="h-5 w-5" />
+                    <span>Benchmark Results</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Performance comparison completed in {formatResponseTime(results.totalTime)}
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+
+              <div className="grid gap-6 lg:grid-cols-1">
+                {results.results
+                  .sort((a, b) => a.responseTime - b.responseTime)
+                  .map((result, index) => {
+                    const isWinner = index === 0 && !result.error;
+                    const [provider, modelName] = result.model.split('/');
+                    
+                    return (
+                      <Card 
+                        key={result.model} 
+                        className={`relative overflow-hidden transition-all ${
+                          isWinner 
+                            ? 'ring-2 ring-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20' 
+                            : ''
+                        }`}
+                      >
+                        {isWinner && (
+                          <div className="absolute right-4 top-4">
+                            <Badge className="bg-yellow-500 text-yellow-50">
+                              <Trophy className="mr-1 h-3 w-3" />
+                              Winner
+                            </Badge>
+                          </div>
                         )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4">
-                  {result.error ? (
-                    <div className="text-sm text-red-600 dark:text-red-400">
-                      {result.error}
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                        {result.response?.choices?.[0]?.message?.content || 'No response generated'}
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                        <span>Tokens: {result.response?.usage?.total_tokens || 0}</span>
-                        <span className="text-green-600 dark:text-green-400">✓ Complete</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                        
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <CardTitle className="text-lg">{modelName}</CardTitle>
+                              <CardDescription className="flex items-center space-x-4 mt-1">
+                                <span className="flex items-center space-x-1">
+                                  <Clock className="h-3 w-3" />
+                                  <span className="font-mono font-medium">
+                                    {formatResponseTime(result.responseTime)}
+                                  </span>
+                                </span>
+                                <Badge variant="outline" className="text-xs">
+                                  {provider}
+                                </Badge>
+                              </CardDescription>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        
+                        <CardContent>
+                          {result.error ? (
+                            <Alert variant="destructive">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertDescription>{result.error}</AlertDescription>
+                            </Alert>
+                          ) : (
+                            <div className="space-y-4">
+                              <ScrollArea className="h-32 w-full rounded-md border p-3">
+                                <div className="text-sm leading-relaxed">
+                                  {result.response?.choices?.[0]?.message?.content || 'No response generated'}
+                                </div>
+                              </ScrollArea>
+                              
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <div className="flex items-center space-x-4">
+                                  <span>Tokens: {result.response?.usage?.total_tokens || 0}</span>
+                                  <span>Rank: #{index + 1}</span>
+                                </div>
+                                <Badge variant="outline" className="text-xs">
+                                  <CheckCircle2 className="mr-1 h-3 w-3" />
+                                  Complete
+                                </Badge>
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
-    </div>
-  </div>
-  )
     </div>
   );
 }
