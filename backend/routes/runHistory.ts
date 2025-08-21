@@ -2,9 +2,13 @@ import db, { RunHistory, RunStats } from '../db.ts';
 
 export async function saveRunHistory(req: Request): Promise<Response> {
   try {
-    const { prompt, models, results } = await req.json();
+    const body = await req.json();
+    console.log('Received run history data:', JSON.stringify(body, null, 2));
+    
+    const { prompt, models, results } = body;
     
     if (!prompt || !models || !results) {
+      console.error('Missing required fields:', { prompt: !!prompt, models: !!models, results: !!results });
       return new Response(JSON.stringify({ 
         success: false, 
         error: 'Missing required fields: prompt, models, results' 
@@ -14,7 +18,31 @@ export async function saveRunHistory(req: Request): Promise<Response> {
       });
     }
 
+    if (!Array.isArray(models)) {
+      console.error('Models is not an array:', typeof models, models);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Models must be an array' 
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (!Array.isArray(results)) {
+      console.error('Results is not an array:', typeof results, results);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Results must be an array' 
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log('Saving run history:', { prompt: prompt.substring(0, 50) + '...', models, resultsCount: results.length });
     const runId = db.saveRunHistory(prompt, models, results);
+    console.log('Successfully saved run history with ID:', runId);
     
     return new Response(JSON.stringify({ 
       success: true, 
@@ -25,9 +53,10 @@ export async function saveRunHistory(req: Request): Promise<Response> {
     });
   } catch (error) {
     console.error('Error saving run history:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return new Response(JSON.stringify({ 
       success: false, 
-      error: 'Failed to save run history' 
+      error: `Failed to save run history: ${error instanceof Error ? error.message : 'Unknown error'}` 
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

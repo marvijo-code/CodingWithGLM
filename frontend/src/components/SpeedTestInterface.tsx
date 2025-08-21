@@ -125,7 +125,6 @@ export function SpeedTestInterface({ onShowDashboard }: SpeedTestInterfaceProps)
   const [apiKey, setApiKey] = useState('');
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [, setApiKeyStatus] = useState(false);
-  const [showGuidance, setShowGuidance] = useState(true);
 
   useEffect(() => {
     // Set random prompt on load
@@ -210,7 +209,6 @@ export function SpeedTestInterface({ onShowDashboard }: SpeedTestInterfaceProps)
     
     setIsRunning(true);
     setResults(null);
-    setShowGuidance(false);
     
     // Initialize streaming results
     const initialResults: StreamingResult[] = selectedModels.map(model => ({
@@ -336,11 +334,7 @@ export function SpeedTestInterface({ onShowDashboard }: SpeedTestInterfaceProps)
         if (prev.length >= 3) {
           return prev; // Limit to 3 models
         }
-        const newSelection = [...prev, modelId];
-        if (newSelection.length === 3) {
-          setShowGuidance(false);
-        }
-        return newSelection;
+        return [...prev, modelId];
       }
     });
   };
@@ -389,111 +383,20 @@ export function SpeedTestInterface({ onShowDashboard }: SpeedTestInterfaceProps)
       {/* Main Interface - Split Layout */}
       {!showApiKeyInput && (
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Top Configuration Panel */}
+          {/* Top Model Selection Panel */}
           <div className="flex-shrink-0 border-b bg-muted/30">
-            <div className="p-4 space-y-4">
-              {/* Prompt Input with Preset Selection */}
-              <div className="flex items-center space-x-4">
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="w-64 justify-between">
-                          <span className="truncate">Choose a programming prompt</span>
-                          <ArrowDown className="ml-2 h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-80 max-h-96 overflow-y-auto">
-                        {Object.entries(PROGRAMMING_PROMPTS).map(([category, { icon: Icon, prompts }]) => (
-                          <div key={category}>
-                            <DropdownMenuLabel className="flex items-center">
-                              <Icon className="mr-2 h-4 w-4" />
-                              {category}
-                            </DropdownMenuLabel>
-                            {prompts.map((promptText, index) => (
-                              <DropdownMenuItem 
-                                key={`${category}-${index}`} 
-                                onClick={() => setPrompt(promptText)}
-                                className="pl-8"
-                              >
-                                <div className="text-sm">
-                                  {promptText.length > 60 ? `${promptText.substring(0, 60)}...` : promptText}
-                                </div>
-                              </DropdownMenuItem>
-                            ))}
-                            <DropdownMenuSeparator />
-                          </div>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const randomPrompt = ALL_PROMPTS[Math.floor(Math.random() * ALL_PROMPTS.length)];
-                        setPrompt(randomPrompt);
-                      }}
-                    >
-                      <Sparkles className="mr-1 h-3 w-3" />
-                      Random
-                    </Button>
-                    {onShowDashboard && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onShowDashboard}
-                      >
-                        <BarChart3 className="mr-1 h-3 w-3" />
-                        Dashboard
-                      </Button>
-                    )}
-                  </div>
-                  <Textarea
-                    placeholder="Enter your test prompt or select one from the dropdown above..."
-                    value={prompt}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
-                    className="min-h-[80px] resize-none text-sm"
-                    maxLength={2000}
-                  />
-                </div>
-                <div className="flex-shrink-0 space-y-2">
-                  <Button
-                    onClick={handleRunTest}
-                    disabled={!prompt.trim() || selectedModels.length === 0 || isRunning}
-                    size="lg"
-                    className="w-36 h-12 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 font-semibold"
-                  >
-                    {isRunning ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Running...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-2 h-5 w-5" />
-                        Run Test
-                      </>
-                    )}
-                  </Button>
-                  <div className="text-xs text-muted-foreground text-center">
-                    {selectedModels.length}/3 models
-                  </div>
-                </div>
-              </div>
-              
+            <div className="p-4">
               {/* Model Selection - Horizontal */}
               <div className="relative">
-                {/* Usage Guidance */}
-                {showGuidance && selectedModels.length < 3 && (
-                  <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 z-10">
-                    <div className="bg-primary text-primary-foreground px-3 py-1 rounded-lg text-sm font-medium animate-bounce">
-                      Select 3 LLMs here
-                    </div>
-                    <div className="flex justify-center mt-1">
-                      <ArrowDown className="h-4 w-4 text-primary animate-bounce" style={{ animationDelay: '0.1s' }} />
-                    </div>
+                {/* Usage Guidance - Always visible */}
+                <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 z-10">
+                  <div className="bg-primary text-primary-foreground px-3 py-1 rounded-lg text-sm font-medium animate-bounce">
+                    Select 3 LLMs here
                   </div>
-                )}
+                  <div className="flex justify-center mt-1">
+                    <ArrowDown className="h-4 w-4 text-primary animate-bounce" style={{ animationDelay: '0.1s' }} />
+                  </div>
+                </div>
                 
                 <div className="flex items-center space-x-2 overflow-x-auto pb-2">
                   {popularModels.slice(0, 8).map((model) => {
@@ -531,9 +434,9 @@ export function SpeedTestInterface({ onShowDashboard }: SpeedTestInterfaceProps)
           </div>
 
           {/* Results Area - Full Height */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden">
             {(isRunning || streamingResults.length > 0) ? (
-              <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-1">
+              <div className="h-full min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-1">
                 {selectedModels.slice(0, 3).map((model, index) => {
                   const streamResult = streamingResults.find(r => r.model === model);
                   const [provider, modelName] = model.split('/');
@@ -543,7 +446,7 @@ export function SpeedTestInterface({ onShowDashboard }: SpeedTestInterfaceProps)
                   return (
                     <div 
                       key={model}
-                      className={`flex flex-col border-r last:border-r-0 transition-all ${
+                      className={`h-full min-h-0 flex flex-col border-r last:border-r-0 transition-all ${
                         isComplete && !hasError
                           ? 'bg-green-50/50 dark:bg-green-950/10'
                           : hasError
@@ -590,97 +493,99 @@ export function SpeedTestInterface({ onShowDashboard }: SpeedTestInterfaceProps)
                         </div>
                       </div>
 
-                      {/* Content Area */}
-                      <div className="flex-1 overflow-hidden">
+                      {/* Content Area with Fixed Height and Scrolling */}
+                      <div className="flex-1 min-h-0 flex flex-col">
                         {hasError ? (
-                          <div className="p-4 h-full flex items-center justify-center">
+                          <div className="flex-1 p-4 flex items-center justify-center">
                             <Alert variant="destructive" className="w-full">
                               <AlertCircle className="h-4 w-4" />
                               <AlertDescription className="text-sm">{streamResult?.error}</AlertDescription>
                             </Alert>
                           </div>
                         ) : (
-                          <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
-                            <div className="p-4 text-sm leading-relaxed space-y-3">
-                              {streamResult?.reasoningContent && (
-                                <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-md border-l-2 border-blue-400">
-                                  <div className="flex items-center space-x-2 mb-2">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300">REASONING</span>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
-                                    {streamResult.reasoningContent}
-                                    {streamResult?.isStreaming && (
-                                      <span className="inline-block w-0.5 h-3 bg-blue-500 animate-pulse ml-1" />
-                                    )}
-                                  </div>
+                          <div className="flex-1 min-h-0 overflow-y-auto p-4 text-sm leading-relaxed space-y-3 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+                            {streamResult?.reasoningContent && (
+                              <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-md border-l-2 border-blue-400">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                  <span className="text-xs font-medium text-blue-700 dark:text-blue-300">REASONING</span>
                                 </div>
-                              )}
-                              
-                              {streamResult?.content ? (
-                                <div>
-                                  {streamResult.reasoningContent && (
-                                    <div className="flex items-center space-x-2 mb-2">
-                                      <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                                      <span className="text-xs font-medium text-green-700 dark:text-green-300">ANSWER</span>
-                                    </div>
+                                <div className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                                  {streamResult.reasoningContent}
+                                  {streamResult?.isStreaming && (
+                                    <span className="inline-block w-0.5 h-3 bg-blue-500 animate-pulse ml-1" />
                                   )}
-                                  <div className="whitespace-pre-wrap">
-                                    {streamResult.content}
-                                    {streamResult?.isStreaming && (
-                                      <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-1" />
-                                    )}
-                                  </div>
                                 </div>
-                              ) : streamResult?.isStreaming ? (
-                                <div className="flex items-center justify-center h-32 text-muted-foreground">
-                                  <div className="flex items-center space-x-2">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span className="text-sm">Generating...</span>
+                              </div>
+                            )}
+                            
+                            {streamResult?.content ? (
+                              <div>
+                                {streamResult.reasoningContent && (
+                                  <div className="flex items-center space-x-2 mb-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                                    <span className="text-xs font-medium text-green-700 dark:text-green-300">ANSWER</span>
                                   </div>
+                                )}
+                                <div className="whitespace-pre-wrap">
+                                  {streamResult.content}
+                                  {streamResult?.isStreaming && (
+                                    <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-1" />
+                                  )}
                                 </div>
-                              ) : isRunning ? (
-                                <div className="flex items-center justify-center h-32 text-muted-foreground">
-                                  <div className="flex items-center space-x-2">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span className="text-sm">Starting...</span>
-                                  </div>
+                              </div>
+                            ) : streamResult?.isStreaming ? (
+                              <div className="flex items-center justify-center h-32 text-muted-foreground">
+                                <div className="flex items-center space-x-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <span className="text-sm">Generating...</span>
                                 </div>
-                              ) : (
-                                <div className="flex items-center justify-center h-32 text-muted-foreground">
-                                  <div className="text-center">
-                                    <Cpu className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                                    <p className="text-sm">Ready</p>
-                                  </div>
+                              </div>
+                            ) : isRunning ? (
+                              <div className="flex items-center justify-center h-32 text-muted-foreground">
+                                <div className="flex items-center space-x-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <span className="text-sm">Starting...</span>
                                 </div>
-                              )}
-                            </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center h-32 text-muted-foreground">
+                                <div className="text-center">
+                                  <Cpu className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                                  <p className="text-sm">Ready</p>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
-                      </div>
-                      
-                      {/* Footer Stats */}
-                      {(streamResult?.tokens || streamResult?.tokensPerSecond || streamResult?.latency) && (
+                        
+                        {/* Footer Stats - Always Visible and Fixed */}
                         <div className="flex-shrink-0 border-t p-2 bg-muted/20">
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <div className="space-y-1">
-                              {streamResult.tokens && (
+                              {streamResult?.tokens ? (
                                 <div>Tokens: {streamResult.tokens}</div>
+                              ) : (
+                                <div>Tokens: -</div>
                               )}
-                              {streamResult.reasoningTokens && (
+                              {streamResult?.reasoningTokens && (
                                 <div className="text-blue-600 dark:text-blue-400">
                                   Reasoning: {streamResult.reasoningTokens}
                                 </div>
                               )}
-                              {streamResult.tokensPerSecond && (
+                              {streamResult?.tokensPerSecond ? (
                                 <div className="text-green-600 dark:text-green-400">
                                   Speed: {streamResult.tokensPerSecond.toFixed(1)} tok/s
                                 </div>
+                              ) : (
+                                <div>Speed: -</div>
                               )}
-                              {streamResult.latency && (
+                              {streamResult?.latency ? (
                                 <div className="text-orange-600 dark:text-orange-400">
                                   Latency: {streamResult.latency}ms
                                 </div>
+                              ) : (
+                                <div>Latency: -</div>
                               )}
                             </div>
                             {isComplete && (
@@ -688,7 +593,7 @@ export function SpeedTestInterface({ onShowDashboard }: SpeedTestInterfaceProps)
                             )}
                           </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                   );
                 })}
@@ -702,6 +607,101 @@ export function SpeedTestInterface({ onShowDashboard }: SpeedTestInterfaceProps)
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Bottom Prompt Panel */}
+          <div className="flex-shrink-0 border-t bg-muted/30">
+            <div className="p-4 space-y-4">
+              {/* Prompt Input with Preset Selection */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="w-64 justify-between">
+                        <span className="truncate">Choose a programming prompt</span>
+                        <ArrowDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-80 max-h-96 overflow-y-auto">
+                      {Object.entries(PROGRAMMING_PROMPTS).map(([category, { icon: Icon, prompts }]) => (
+                        <div key={category}>
+                          <DropdownMenuLabel className="flex items-center">
+                            <Icon className="mr-2 h-4 w-4" />
+                            {category}
+                          </DropdownMenuLabel>
+                          {prompts.map((promptText, index) => (
+                            <DropdownMenuItem 
+                              key={`${category}-${index}`} 
+                              onClick={() => setPrompt(promptText)}
+                              className="pl-8"
+                            >
+                              <div className="text-sm">
+                                {promptText.length > 60 ? `${promptText.substring(0, 60)}...` : promptText}
+                              </div>
+                            </DropdownMenuItem>
+                          ))}
+                          <DropdownMenuSeparator />
+                        </div>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const randomPrompt = ALL_PROMPTS[Math.floor(Math.random() * ALL_PROMPTS.length)];
+                      setPrompt(randomPrompt);
+                    }}
+                  >
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    Random
+                  </Button>
+                  {onShowDashboard && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onShowDashboard}
+                    >
+                      <BarChart3 className="mr-1 h-3 w-3" />
+                      Dashboard
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  <Textarea
+                    placeholder="Enter your test prompt or select one from the dropdown above..."
+                    value={prompt}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
+                    className="flex-1 min-h-[80px] resize-none text-sm"
+                    maxLength={2000}
+                  />
+                  <div className="flex flex-col items-center space-y-2">
+                    <Button
+                      onClick={handleRunTest}
+                      disabled={!prompt.trim() || selectedModels.length === 0 || isRunning}
+                      size="lg"
+                      className="w-36 h-12 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 font-semibold"
+                    >
+                      {isRunning ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Running...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="mr-2 h-5 w-5" />
+                          Run Test
+                        </>
+                      )}
+                    </Button>
+                    <div className="text-xs text-muted-foreground text-center">
+                      {selectedModels.length}/3 models
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
