@@ -10,7 +10,6 @@ import { Separator } from '@/components/ui/separator'
 import { 
   Loader2, 
   Zap, 
-  Trophy, 
   Clock, 
   Cpu, 
   Settings, 
@@ -27,9 +26,35 @@ interface ApiKeyStatusResponse {
   hasApiKey: boolean;
 }
 
+// Common test prompts for random selection
+const SAMPLE_PROMPTS = [
+  "Write a Python function to implement a binary search algorithm with error handling and comprehensive documentation.",
+  "Explain the concept of recursion and provide a practical example with a recursive function to calculate factorial.",
+  "Create a REST API endpoint in Node.js that handles user authentication with JWT tokens and proper error handling.",
+  "Write a React component that fetches data from an API and displays it in a responsive table with sorting functionality.",
+  "Implement a simple machine learning model using Python to classify text sentiment (positive/negative/neutral).",
+  "Design a database schema for an e-commerce platform including users, products, orders, and relationships.",
+  "Write a comprehensive guide on implementing clean code principles in JavaScript with practical examples.",
+  "Create a CSS animation that smoothly transitions between different states with proper browser compatibility.",
+  "Explain the differences between SQL and NoSQL databases and when to use each approach.",
+  "Write a function that efficiently finds the longest common subsequence between two strings."
+];
+
+interface StreamingResult {
+  model: string;
+  content: string;
+  reasoningContent?: string;
+  isComplete: boolean;
+  error?: string;
+  responseTime?: number;
+  tokens?: number;
+  reasoningTokens?: number;
+}
+
 export function SpeedTestInterface() {
   const [prompt, setPrompt] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [streamingResults, setStreamingResults] = useState<StreamingResult[]>([]);
   const [popularModels, setPopularModels] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<SpeedTestComparison | null>(null);
@@ -38,6 +63,10 @@ export function SpeedTestInterface() {
   const [, setApiKeyStatus] = useState(false);
 
   useEffect(() => {
+    // Set random prompt on load
+    const randomPrompt = SAMPLE_PROMPTS[Math.floor(Math.random() * SAMPLE_PROMPTS.length)];
+    setPrompt(randomPrompt);
+
     // Check API key status
     const checkApiKeyStatus = async () => {
       try {
@@ -46,6 +75,8 @@ export function SpeedTestInterface() {
           const data = response.data as ApiKeyStatusResponse;
           setApiKeyStatus(data.hasApiKey);
           setShowApiKeyInput(!data.hasApiKey);
+        } else {
+          setShowApiKeyInput(true);
         }
       } catch (error) {
         console.error('Error checking API key status:', error);
@@ -53,21 +84,23 @@ export function SpeedTestInterface() {
       }
     };
 
-    // Load popular models
-    const loadPopularModels = async () => {
-      try {
-        const response = await apiService.getPopularModels();
-        if (response.success && response.data) {
-          const models = response.data as string[];
-          setPopularModels(models);
-          setSelectedModels(models.slice(0, 3)); // Select first 3 by default
-        }
-      } catch (error) {
-        console.error('Error loading popular models:', error);
-      }
-    };
-
     checkApiKeyStatus();
+  }, []);
+
+  const loadPopularModels = async () => {
+    try {
+      const response = await apiService.getPopularModels();
+      if (response.success && response.data) {
+        const models = response.data as string[];
+        setPopularModels(models);
+        setSelectedModels(models.slice(0, 3)); // Select first 3 by default
+      }
+    } catch (error) {
+      console.error('Error loading popular models:', error);
+    }
+  };
+
+  useEffect(() => {
     loadPopularModels();
   }, []);
 
@@ -94,18 +127,34 @@ export function SpeedTestInterface() {
     setIsRunning(true);
     setResults(null);
     
+    // Initialize streaming results
+    const initialResults: StreamingResult[] = selectedModels.map(model => ({
+      model,
+      content: '',
+      isComplete: false
+    }));
+    setStreamingResults(initialResults);
+    
     try {
       const response = await apiService.runSpeedTest({
-        prompt,
-        models: selectedModels,
-        temperature: 0.7,
-        max_tokens: 1000,
+        prompt: prompt.trim(),
+        models: selectedModels
       });
       
       if (response.success && response.data) {
         setResults(response.data);
+        // Update streaming results with final data
+        const finalResults = response.data.results.map(result => ({
+          model: result.model,
+          content: result.response?.choices?.[0]?.message?.content || 'No response generated',
+          isComplete: true,
+          error: result.error || undefined,
+          responseTime: result.responseTime,
+          tokens: result.response?.usage?.total_tokens
+        }));
+        setStreamingResults(finalResults);
       } else {
-        console.error('Error running speed test:', response.error);
+        console.error('Speed test failed:', response.error);
       }
     } catch (error) {
       console.error('Error running speed test:', error);
@@ -137,298 +186,257 @@ export function SpeedTestInterface() {
 
 
   return (
-    <div className="space-y-8">
-      {/* Hero Section */}
-      <div className="text-center space-y-6">
-        <div className="space-y-2">
-          <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground hover:bg-primary/80">
-            <Sparkles className="mr-1 h-3 w-3" />
-            AI Performance Benchmarking
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-            LLM Speed Arena
-          </h1>
-          <p className="mx-auto max-w-[700px] text-lg text-muted-foreground sm:text-xl">
-            Compare AI model performance in real-time. Benchmark response times, quality, and efficiency across multiple providers with enterprise-grade precision.
-          </p>
-        </div>
-        
-        <div className="flex items-center justify-center space-x-6">
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            <span>Real-time Testing</span>
-          </div>
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-            <span>Multi-Provider</span>
-          </div>
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <div className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
-            <span>Enterprise Ready</span>
-          </div>
-        </div>
-      </div>
+    <div className="h-full flex flex-col">
 
-      {/* API Key Setup */}
+      {/* API Key Setup - Centered */}
       {showApiKeyInput && (
-        <div className="mx-auto max-w-md">
-          <Card className="border-0 shadow-lg">
-            <CardHeader className="text-center pb-2">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <Settings className="h-6 w-6 text-primary" />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center pb-4">
+              <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Settings className="h-5 w-5 text-primary" />
               </div>
-              <CardTitle className="text-2xl">Get Started</CardTitle>
-              <CardDescription>
-                Connect your OpenRouter API key to unlock AI model benchmarking
+              <CardTitle className="text-xl">Connect API Key</CardTitle>
+              <CardDescription className="text-sm">
+                Enter your OpenRouter API key to start benchmarking
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  OpenRouter API Key
-                </label>
                 <Input
                   type="password"
                   placeholder="sk-or-v1-..."
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  className="font-mono"
+                  className="font-mono text-sm"
                 />
               </div>
               <Button 
                 onClick={handleSaveApiKey} 
                 disabled={!apiKey.trim()}
                 className="w-full"
-                size="lg"
               >
                 <Zap className="mr-2 h-4 w-4" />
-                Connect & Start Testing
+                Connect
               </Button>
-              <p className="text-xs text-center text-muted-foreground">
-                Your API key is securely stored locally and never shared.
-              </p>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Main Interface */}
+      {/* Main Interface - Split Layout */}
       {!showApiKeyInput && (
-        <div className="mx-auto max-w-4xl space-y-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Cpu className="h-5 w-5" />
-                <span>Configure Benchmark</span>
-              </CardTitle>
-              <CardDescription>
-                Design your test prompt and select AI models for performance comparison
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Prompt Configuration */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    Test Prompt
-                  </label>
-                  <Badge variant="outline" className="text-xs">
-                    {prompt.length}/2000 characters
-                  </Badge>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Top Configuration Panel */}
+          <div className="flex-shrink-0 border-b bg-muted/30">
+            <div className="p-4 space-y-4">
+              {/* Prompt Input */}
+              <div className="flex items-center space-x-4">
+                <div className="flex-1">
+                  <Textarea
+                    placeholder="Enter your test prompt..."
+                    value={prompt}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
+                    className="min-h-[80px] resize-none text-sm"
+                    maxLength={2000}
+                  />
                 </div>
-                <Textarea
-                  placeholder="Enter a detailed prompt to benchmark AI models. Example: 'Write a Python function to implement a binary search algorithm with error handling and documentation.'"
-                  value={prompt}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
-                  className="min-h-[120px] resize-none"
-                  maxLength={2000}
-                />
-                <p className="text-xs text-muted-foreground">
-                  💡 Use specific, technical prompts for more meaningful performance comparisons
-                </p>
+                <div className="flex-shrink-0 space-y-2">
+                  <Button
+                    onClick={handleRunTest}
+                    disabled={!prompt.trim() || selectedModels.length === 0 || isRunning}
+                    size="lg"
+                    className="w-32"
+                  >
+                    {isRunning ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-4 w-4" />
+                        Run Test
+                      </>
+                    )}
+                  </Button>
+                  <div className="text-xs text-muted-foreground text-center">
+                    {selectedModels.length}/3 models
+                  </div>
+                </div>
               </div>
-
-              <Separator />
-
-              {/* Model Selection */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium leading-none">
-                    AI Models
-                  </label>
-                  <Badge variant={selectedModels.length > 0 ? "default" : "secondary"}>
-                    {selectedModels.length}/3 selected
-                  </Badge>
-                </div>
-                
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {popularModels.map((model) => {
-                    const isSelected = selectedModels.includes(model);
-                    const [provider, modelName] = model.split('/');
-                    
-                    return (
-                      <Card 
-                        key={model}
-                        className={`cursor-pointer transition-all hover:shadow-md ${
-                          isSelected 
-                            ? 'ring-2 ring-primary bg-primary/5' 
-                            : 'hover:bg-muted/50'
-                        }`}
-                        onClick={() => toggleModelSelection(model)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="space-y-1">
-                              <p className="text-sm font-medium leading-none">
-                                {modelName}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {provider}
-                              </p>
-                            </div>
-                            <div className={`h-4 w-4 rounded-full border-2 ${
-                              isSelected 
-                                ? 'bg-primary border-primary' 
-                                : 'border-muted-foreground/25'
-                            }`}>
-                              {isSelected && (
-                                <CheckCircle2 className="h-4 w-4 text-primary-foreground" />
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-                
-                {selectedModels.length === 0 && (
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      Select at least one AI model to begin benchmarking.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-
-              <Separator />
-
-              {/* Action Button */}
-              <Button
-                onClick={handleRunTest}
-                disabled={!prompt.trim() || selectedModels.length === 0 || isRunning}
-                className="w-full"
-                size="lg"
-              >
-                {isRunning ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Benchmarking Models...
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    Start Performance Test
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
-          
-          {/* Results Section */}
-          {results && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <TrendingUp className="h-5 w-5" />
-                    <span>Benchmark Results</span>
-                  </CardTitle>
-                  <CardDescription>
-                    Performance comparison completed in {formatResponseTime(results.totalTime)}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <div className="grid gap-6 lg:grid-cols-1">
-                {results.results
-                  .sort((a, b) => a.responseTime - b.responseTime)
-                  .map((result, index) => {
-                    const isWinner = index === 0 && !result.error;
-                    const [provider, modelName] = result.model.split('/');
-                    
-                    return (
-                      <Card 
-                        key={result.model} 
-                        className={`relative overflow-hidden transition-all ${
-                          isWinner 
-                            ? 'ring-2 ring-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20' 
-                            : ''
-                        }`}
-                      >
-                        {isWinner && (
-                          <div className="absolute right-4 top-4">
-                            <Badge className="bg-yellow-500 text-yellow-50">
-                              <Trophy className="mr-1 h-3 w-3" />
-                              Winner
-                            </Badge>
-                          </div>
-                        )}
-                        
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <CardTitle className="text-lg">{modelName}</CardTitle>
-                              <CardDescription className="flex items-center space-x-4 mt-1">
-                                <span className="flex items-center space-x-1">
-                                  <Clock className="h-3 w-3" />
-                                  <span className="font-mono font-medium">
-                                    {formatResponseTime(result.responseTime)}
-                                  </span>
-                                </span>
-                                <Badge variant="outline" className="text-xs">
-                                  {provider}
-                                </Badge>
-                              </CardDescription>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        
-                        <CardContent>
-                          {result.error ? (
-                            <Alert variant="destructive">
-                              <AlertCircle className="h-4 w-4" />
-                              <AlertDescription>{result.error}</AlertDescription>
-                            </Alert>
-                          ) : (
-                            <div className="space-y-4">
-                              <ScrollArea className="h-32 w-full rounded-md border p-3">
-                                <div className="text-sm leading-relaxed">
-                                  {result.response?.choices?.[0]?.message?.content || 'No response generated'}
-                                </div>
-                              </ScrollArea>
-                              
-                              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <div className="flex items-center space-x-4">
-                                  <span>Tokens: {result.response?.usage?.total_tokens || 0}</span>
-                                  <span>Rank: #{index + 1}</span>
-                                </div>
-                                <Badge variant="outline" className="text-xs">
-                                  <CheckCircle2 className="mr-1 h-3 w-3" />
-                                  Complete
-                                </Badge>
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+              
+              {/* Model Selection - Horizontal */}
+              <div className="flex items-center space-x-2 overflow-x-auto pb-2">
+                {popularModels.slice(0, 8).map((model) => {
+                  const isSelected = selectedModels.includes(model);
+                  const [provider, modelName] = model.split('/');
+                  const isDisabled = selectedModels.length >= 3 && !isSelected;
+                  
+                  return (
+                    <button
+                      key={model}
+                      className={`flex-shrink-0 px-3 py-2 rounded-lg border text-sm transition-all ${
+                        isSelected 
+                          ? 'bg-primary text-primary-foreground border-primary' 
+                          : isDisabled
+                          ? 'opacity-50 cursor-not-allowed border-muted'
+                          : 'hover:bg-muted border-muted'
+                      }`}
+                      onClick={() => !isDisabled && toggleModelSelection(model)}
+                    >
+                      <div className="text-center">
+                        <div className="font-medium">{modelName}</div>
+                        <div className="text-xs opacity-70">{provider}</div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          )}
+          </div>
+
+          {/* Results Area - Full Height */}
+          <div className="flex-1 overflow-hidden">
+            {(isRunning || streamingResults.length > 0) ? (
+              <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-1">
+                {selectedModels.slice(0, 3).map((model, index) => {
+                  const streamResult = streamingResults.find(r => r.model === model);
+                  const [provider, modelName] = model.split('/');
+                  const isComplete = streamResult?.isComplete || false;
+                  const hasError = streamResult?.error;
+                  
+                  return (
+                    <div 
+                      key={model}
+                      className={`flex flex-col border-r last:border-r-0 transition-all ${
+                        isComplete && !hasError
+                          ? 'bg-green-50/50 dark:bg-green-950/10'
+                          : hasError
+                          ? 'bg-red-50/50 dark:bg-red-950/10'
+                          : 'bg-background'
+                      }`}
+                    >
+                      {/* Model Header */}
+                      <div className="flex-shrink-0 p-3 border-b bg-muted/30">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-sm">{modelName}</span>
+                            {isRunning && !isComplete && (
+                              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                            )}
+                            {isComplete && !hasError && (
+                              <CheckCircle2 className="h-3 w-3 text-green-500" />
+                            )}
+                            {hasError && (
+                              <AlertCircle className="h-3 w-3 text-red-500" />
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                            <Badge variant="outline" className="text-xs px-1">
+                              {provider}
+                            </Badge>
+                            {streamResult?.responseTime && (
+                              <span className="flex items-center space-x-1">
+                                <Clock className="h-2.5 w-2.5" />
+                                <span className="font-mono">
+                                  {formatResponseTime(streamResult.responseTime)}
+                                </span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Content Area */}
+                      <div className="flex-1 overflow-hidden">
+                        {hasError ? (
+                          <div className="p-4 h-full flex items-center justify-center">
+                            <Alert variant="destructive" className="w-full">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertDescription className="text-sm">{streamResult?.error}</AlertDescription>
+                            </Alert>
+                          </div>
+                        ) : (
+                          <ScrollArea className="h-full">
+                            <div className="p-4 text-sm leading-relaxed space-y-3">
+                              {streamResult?.reasoningContent && (
+                                <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-md border-l-2 border-blue-400">
+                                  <div className="flex items-center space-x-2 mb-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300">REASONING</span>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                                    {streamResult.reasoningContent}
+                                    {isRunning && !isComplete && (
+                                      <span className="inline-block w-0.5 h-3 bg-blue-500 animate-pulse ml-1" />
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {streamResult?.content ? (
+                                <div>
+                                  {streamResult.reasoningContent && (
+                                    <div className="flex items-center space-x-2 mb-2">
+                                      <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                                      <span className="text-xs font-medium text-green-700 dark:text-green-300">ANSWER</span>
+                                    </div>
+                                  )}
+                                  <div className="whitespace-pre-wrap">
+                                    {streamResult.content}
+                                    {isRunning && !isComplete && (
+                                      <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-1" />
+                                    )}
+                                  </div>
+                                </div>
+                              ) : isRunning ? (
+                                <div className="flex items-center justify-center h-32 text-muted-foreground">
+                                  <div className="flex items-center space-x-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span className="text-sm">Generating...</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-center h-32 text-muted-foreground">
+                                  <div className="text-center">
+                                    <Cpu className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                                    <p className="text-sm">Ready</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </ScrollArea>
+                        )}
+                      </div>
+                      
+                      {/* Footer Stats */}
+                      {isComplete && streamResult?.tokens && (
+                        <div className="flex-shrink-0 border-t p-2 bg-muted/20">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <div>
+                              <div>Total: {streamResult.tokens}</div>
+                              {streamResult.reasoningTokens && (
+                                <div className="text-blue-600 dark:text-blue-400">
+                                  Reasoning: {streamResult.reasoningTokens}
+                                </div>
+                              )}
+                            </div>
+                            <CheckCircle2 className="h-3 w-3 text-green-500" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium">Ready to Benchmark</p>
+                  <p className="text-sm">Select models and run a test to see live results</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
